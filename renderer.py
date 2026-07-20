@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import math
 import re
-from datetime import datetime
+from datetime import datetime, tzinfo
+from email.utils import parsedate_to_datetime
 from functools import lru_cache
 from io import BytesIO
 from pathlib import Path
@@ -752,6 +753,30 @@ def _format_overview_date(value: datetime, language: str) -> str:
     return f"{value.year}年{value.month:02d}月{value.day:02d}日  {value:%H:%M:%S}"
 
 
+def _format_event_time(value: str, display_timezone: tzinfo | None) -> str:
+    """Convert an official event timestamp to the image display timezone."""
+    original = " ".join(str(value or "").split())
+    if not original:
+        return ""
+    parsed: datetime | None = None
+    try:
+        parsed = datetime.fromisoformat(
+            f"{original[:-1]}+00:00" if original.endswith(("Z", "z")) else original
+        )
+    except ValueError:
+        try:
+            parsed = parsedate_to_datetime(original)
+        except (TypeError, ValueError, OverflowError):
+            return original
+    if parsed.tzinfo is None:
+        return original
+    target_timezone = display_timezone or datetime.now().astimezone().tzinfo
+    localized = parsed.astimezone(target_timezone)
+    offset = localized.strftime("%z")
+    offset_label = f"UTC{offset[:3]}:{offset[3:]}" if offset else ""
+    return f"{localized:%Y-%m-%d %H:%M:%S} {offset_label}".rstrip()
+
+
 def _localized_pair(
     text: str,
     translations: dict[str, str],
@@ -855,6 +880,7 @@ def render_alert_card(
     events: list[tuple[str, Issue]],
     translations: dict[str, str] | None = None,
     language: str = "bilingual",
+    display_timezone: tzinfo | None = None,
 ) -> bytes:
     """Render one vendor's changed issues into a polished bilingual PNG card.
 
@@ -863,6 +889,7 @@ def render_alert_card(
         events: Stage and issue pairs for this notification.
         translations: Original official strings mapped to Chinese translations.
         language: ``zh-CN``, ``en-US``, or ``bilingual``.
+        display_timezone: Timezone used for official event timestamps.
 
     Returns:
         Encoded PNG bytes.
@@ -1051,7 +1078,12 @@ def render_alert_card(
         draw.line((82, meta_y - 15, WIDTH - 82, meta_y - 15), fill="#E6E3DC", width=1)
         if issue.updated_at:
             _paste_icon(image, "clock", (82, meta_y), 18, MUTED)
-            draw.text((110, meta_y - 2), issue.updated_at, font=_font(17), fill=MUTED)
+            draw.text(
+                (110, meta_y - 2),
+                _format_event_time(issue.updated_at, display_timezone),
+                font=_font(17),
+                fill=MUTED,
+            )
         if issue.status_url:
             parsed = urlparse(issue.status_url)
             url_text = issue.status_url

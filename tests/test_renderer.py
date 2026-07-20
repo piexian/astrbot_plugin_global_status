@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from io import BytesIO
+from zoneinfo import ZoneInfo
 
 from PIL import Image
 
@@ -8,6 +9,7 @@ from data.plugins.astrbot_plugin_global_status.renderer import (
     PROJECT_SIGNATURE,
     _event_layout,
     _font,
+    _format_event_time,
     _format_overview_date,
     _svg_icon,
     _text_width,
@@ -76,6 +78,22 @@ def test_svg_icon_assets_rasterize_without_native_dependencies():
         assert icon.mode == "RGBA"
         assert icon.size == (48, 48)
         assert icon.getbbox() is not None
+
+
+def test_event_times_use_the_configured_image_timezone():
+    shanghai = ZoneInfo("Asia/Shanghai")
+    new_york = ZoneInfo("America/New_York")
+
+    assert _format_event_time("2026-07-20T08:31:10.729Z", shanghai) == (
+        "2026-07-20 16:31:10 UTC+08:00"
+    )
+    assert _format_event_time("Mon, 20 Jul 2026 01:00:00 GMT", shanghai) == (
+        "2026-07-20 09:00:00 UTC+08:00"
+    )
+    assert _format_event_time("2026-07-20T08:31:10+00:00", new_york) == (
+        "2026-07-20 04:31:10 UTC-04:00"
+    )
+    assert _format_event_time("unknown time", shanghai) == "unknown time"
 
 
 def test_bilingual_alert_preserves_english_and_localizes_fallback():

@@ -56,7 +56,7 @@
     "description": "状态图片时间时区",
     "type": "string",
     "default": "",
-    "hint": "控制总览图顶部精确到秒的时间。填写 IANA 时区名称，例如 Asia/Shanghai；留空时跟随 AstrBot 全局“时区”设置，两处都为空时使用系统本地时区。"
+    "hint": "控制总览图和告警卡内所有时间。填写 IANA 时区名称，例如 Asia/Shanghai；留空时跟随 AstrBot 全局“时区”设置，两处都为空时使用系统本地时区。"
   },
   "enable_ai_translation": {
     "description": "使用对话模型翻译官方英文内容",
