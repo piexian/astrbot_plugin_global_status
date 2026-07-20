@@ -5,6 +5,7 @@ from zoneinfo import ZoneInfo
 from PIL import Image
 
 from data.plugins.astrbot_plugin_global_status.renderer import (
+    CARD_THEMES,
     ICON_DIR,
     PROJECT_SIGNATURE,
     _event_layout,
@@ -15,6 +16,7 @@ from data.plugins.astrbot_plugin_global_status.renderer import (
     _text_width,
     _wrap_text,
     build_alert_fallback,
+    normalize_card_theme,
     render_alert_card,
     render_overview,
 )
@@ -94,6 +96,53 @@ def test_event_times_use_the_configured_image_timezone():
         "2026-07-20 04:31:10 UTC-04:00"
     )
     assert _format_event_time("unknown time", shanghai) == "unknown time"
+
+
+def test_all_card_themes_render_alerts_and_overviews():
+    issue = Issue(
+        source_id="openai",
+        source_name="OpenAI",
+        issue_id="theme-preview",
+        severity="critical",
+        title="Elevated API errors",
+        detail="We are investigating elevated errors.",
+        updated_at="2026-07-20T08:31:10Z",
+        status_url="https://status.openai.com/",
+    )
+    result = SourceResult(
+        SourceSpec(
+            "openai",
+            "OpenAI",
+            "statuspage",
+            "https://status.openai.com",
+            "https://status.openai.com/",
+        ),
+        True,
+        {issue.issue_id: issue},
+    )
+    top_bar_colors = set()
+
+    for theme_name in CARD_THEMES:
+        alert = Image.open(
+            BytesIO(
+                render_alert_card(
+                    "OpenAI",
+                    [("new", issue)],
+                    card_theme=theme_name,
+                )
+            )
+        )
+        overview = Image.open(
+            BytesIO(render_overview([result], card_theme=theme_name))
+        )
+
+        assert alert.format == "PNG"
+        assert overview.format == "PNG"
+        top_bar_colors.add(alert.convert("RGB").getpixel((10, 3)))
+
+    assert len(top_bar_colors) == len(CARD_THEMES)
+    assert normalize_card_theme("MIDNIGHT") == "midnight"
+    assert normalize_card_theme("unknown") == "paper"
 
 
 def test_bilingual_alert_preserves_english_and_localizes_fallback():

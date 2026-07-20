@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 import re
+from dataclasses import dataclass
 from datetime import datetime, tzinfo
 from email.utils import parsedate_to_datetime
 from functools import lru_cache
@@ -12,7 +13,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 from xml.etree import ElementTree
 
-from PIL import Image, ImageChops, ImageDraw, ImageFont
+from PIL import Image, ImageChops, ImageColor, ImageDraw, ImageFont
 
 from astrbot.core.utils.astrbot_path import get_astrbot_data_path
 
@@ -20,25 +21,168 @@ from .sources import Issue, SourceResult
 from .translation import normalize_language
 
 WIDTH = 1200
-BACKGROUND_TOP = "#ECEAE5"
-BACKGROUND_BOTTOM = "#ECEAE5"
-SURFACE = "#FAF9F6"
-SURFACE_ALT = "#F5F3EE"
-TEXT = "#19222C"
-TEXT_SOFT = "#36414C"
-MUTED = "#727B84"
-BORDER = "#D4D1CA"
 ICON_DIR = Path(__file__).parent / "assets" / "icons"
 PROJECT_SIGNATURE = "github.com/Futureppo/astrbot_plugin_global_status"
 
-SEVERITY_COLORS = {
-    "critical": "#BD3342",
-    "warning": "#A86B0A",
-    "maintenance": "#31699D",
-    "info": "#31699D",
-    "operational": "#287256",
-    "unavailable": "#707982",
+
+@dataclass(frozen=True, slots=True)
+class CardTheme:
+    """Color and geometry tokens for one status card theme."""
+
+    background_top: str
+    background_bottom: str
+    surface: str
+    surface_alt: str
+    icon_surface: str
+    text: str
+    text_soft: str
+    muted: str
+    border: str
+    panel_highlight: str
+    chrome: str
+    divider: str
+    link: str
+    footer: str
+    critical_surface: str
+    warning_surface: str
+    unavailable_surface: str
+    severity_colors: dict[str, str]
+    panel_radius: int
+    badge_radius: int
+    table_radius: int
+
+
+CARD_THEMES: dict[str, CardTheme] = {
+    "paper": CardTheme(
+        background_top="#ECEAE5",
+        background_bottom="#ECEAE5",
+        surface="#FAF9F6",
+        surface_alt="#F5F3EE",
+        icon_surface="#FAF9F6",
+        text="#19222C",
+        text_soft="#36414C",
+        muted="#727B84",
+        border="#D4D1CA",
+        panel_highlight="#FFFFFF",
+        chrome="#222B34",
+        divider="#E6E3DC",
+        link="#315F7C",
+        footer="#858B91",
+        critical_surface="#FBF0F1",
+        warning_surface="#FCF6E9",
+        unavailable_surface="#F1F2F2",
+        severity_colors={
+            "critical": "#BD3342",
+            "warning": "#A86B0A",
+            "maintenance": "#31699D",
+            "info": "#31699D",
+            "operational": "#287256",
+            "unavailable": "#707982",
+        },
+        panel_radius=16,
+        badge_radius=16,
+        table_radius=14,
+    ),
+    "midnight": CardTheme(
+        background_top="#0B1020",
+        background_bottom="#11182C",
+        surface="#151D31",
+        surface_alt="#11192B",
+        icon_surface="#F8FAFC",
+        text="#F3F6FC",
+        text_soft="#D7E1F1",
+        muted="#91A0B8",
+        border="#2C3955",
+        panel_highlight="#263450",
+        chrome="#8B72FF",
+        divider="#25334D",
+        link="#73C7FF",
+        footer="#72829C",
+        critical_surface="#2A1722",
+        warning_surface="#2B2418",
+        unavailable_surface="#1A2230",
+        severity_colors={
+            "critical": "#FF6B7A",
+            "warning": "#F5B942",
+            "maintenance": "#75A7FF",
+            "info": "#75A7FF",
+            "operational": "#5FD0A5",
+            "unavailable": "#94A3B8",
+        },
+        panel_radius=12,
+        badge_radius=12,
+        table_radius=12,
+    ),
+    "porcelain": CardTheme(
+        background_top="#E8F1EC",
+        background_bottom="#F5F0E7",
+        surface="#FBFCF8",
+        surface_alt="#F0F6F1",
+        icon_surface="#FBFCF8",
+        text="#17322E",
+        text_soft="#385B54",
+        muted="#6D817C",
+        border="#C9D9D2",
+        panel_highlight="#FFFFFF",
+        chrome="#2F7468",
+        divider="#D7E3DE",
+        link="#236E75",
+        footer="#72847F",
+        critical_surface="#FAEDEF",
+        warning_surface="#F9F2DF",
+        unavailable_surface="#EEF2F0",
+        severity_colors={
+            "critical": "#B83A4B",
+            "warning": "#A56713",
+            "maintenance": "#327B7A",
+            "info": "#327B7A",
+            "operational": "#26715D",
+            "unavailable": "#708078",
+        },
+        panel_radius=24,
+        badge_radius=24,
+        table_radius=22,
+    ),
+    "terminal": CardTheme(
+        background_top="#07110C",
+        background_bottom="#020805",
+        surface="#0A1710",
+        surface_alt="#0D1D14",
+        icon_surface="#F6FFF8",
+        text="#D9FFE5",
+        text_soft="#A8DDB7",
+        muted="#6D9B79",
+        border="#1D4A2C",
+        panel_highlight="#123520",
+        chrome="#39FF88",
+        divider="#163C24",
+        link="#58E6FF",
+        footer="#4D8A5E",
+        critical_surface="#251017",
+        warning_surface="#241F0B",
+        unavailable_surface="#101A15",
+        severity_colors={
+            "critical": "#FF4D6D",
+            "warning": "#FFD166",
+            "maintenance": "#00E5FF",
+            "info": "#00E5FF",
+            "operational": "#39FF88",
+            "unavailable": "#91A39A",
+        },
+        panel_radius=2,
+        badge_radius=2,
+        table_radius=2,
+    ),
 }
+
+DEFAULT_CARD_THEME = "paper"
+
+
+def normalize_card_theme(value: object) -> str:
+    """Return a supported card theme identifier."""
+    normalized = str(value or "").strip().lower()
+    return normalized if normalized in CARD_THEMES else DEFAULT_CARD_THEME
+
 
 VENDOR_COLORS = {
     "openai": "#10A37F",
@@ -686,27 +830,50 @@ def _paste_icon(
     image.alpha_composite(icon, position)
 
 
-def _new_canvas(height: int) -> Image.Image:
-    image = Image.new("RGBA", (WIDTH, height), BACKGROUND_TOP)
+def _new_canvas(height: int, theme: CardTheme) -> Image.Image:
+    image = Image.new("RGBA", (WIDTH, height), theme.background_top)
     draw = ImageDraw.Draw(image)
-    draw.rectangle((0, 0, WIDTH, 8), fill="#222B34")
-    draw.line((52, 24, WIDTH - 52, 24), fill="#D8D5CE", width=1)
+    if theme.background_top != theme.background_bottom:
+        top = ImageColor.getrgb(theme.background_top)
+        bottom = ImageColor.getrgb(theme.background_bottom)
+        denominator = max(1, height - 1)
+        for y in range(height):
+            position = y / denominator
+            color = tuple(
+                round(start + (end - start) * position)
+                for start, end in zip(top, bottom, strict=True)
+            )
+            draw.line((0, y, WIDTH, y), fill=color)
+    draw.rectangle((0, 0, WIDTH, 8), fill=theme.chrome)
+    draw.line((52, 24, WIDTH - 52, 24), fill=theme.border, width=1)
     return image
 
 
 def _draw_panel(
     image: Image.Image,
     bounds: tuple[int, int, int, int],
-    fill: str = SURFACE,
-    radius: int = 16,
+    theme: CardTheme,
+    fill: str | None = None,
+    radius: int | None = None,
 ) -> None:
     x1, y1, x2, y2 = bounds
     draw = ImageDraw.Draw(image)
-    draw.rounded_rectangle(bounds, radius=radius, fill=fill, outline=BORDER, width=1)
-    draw.line((x1 + radius, y1 + 1, x2 - radius, y1 + 1), fill="#FFFFFF", width=1)
+    panel_radius = theme.panel_radius if radius is None else radius
+    draw.rounded_rectangle(
+        bounds,
+        radius=panel_radius,
+        fill=fill or theme.surface,
+        outline=theme.border,
+        width=1,
+    )
+    draw.line(
+        (x1 + panel_radius, y1 + 1, x2 - panel_radius, y1 + 1),
+        fill=theme.panel_highlight,
+        width=1,
+    )
 
 
-def _draw_project_footer(image: Image.Image, y: int) -> None:
+def _draw_project_footer(image: Image.Image, y: int, theme: CardTheme) -> None:
     """Draw the centered GitHub repository link in the image footer."""
     draw = ImageDraw.Draw(image)
     font = _font(17)
@@ -720,13 +887,13 @@ def _draw_project_footer(image: Image.Image, y: int) -> None:
         "github",
         (round(footer_x), y + 1),
         icon_size,
-        "#858B91",
+        theme.footer,
     )
     draw.text(
         (footer_x + icon_size + gap, y - 1),
         PROJECT_SIGNATURE,
         font=font,
-        fill="#858B91",
+        fill=theme.footer,
     )
 
 
@@ -881,6 +1048,7 @@ def render_alert_card(
     translations: dict[str, str] | None = None,
     language: str = "bilingual",
     display_timezone: tzinfo | None = None,
+    card_theme: str = DEFAULT_CARD_THEME,
 ) -> bytes:
     """Render one vendor's changed issues into a polished bilingual PNG card.
 
@@ -890,6 +1058,7 @@ def render_alert_card(
         translations: Original official strings mapped to Chinese translations.
         language: ``zh-CN``, ``en-US``, or ``bilingual``.
         display_timezone: Timezone used for official event timestamps.
+        card_theme: Configured visual theme identifier.
 
     Returns:
         Encoded PNG bytes.
@@ -901,20 +1070,21 @@ def render_alert_card(
         raise ValueError("At least one alert event is required")
     language = normalize_language(language)
     translations = translations or {}
+    theme = CARD_THEMES[normalize_card_theme(card_theme)]
     layouts = [
         _event_layout(stage, issue, translations, language) for stage, issue in events
     ]
     height = 164 + sum(int(layout["height"]) + 20 for layout in layouts) + 68
-    image = _new_canvas(height)
+    image = _new_canvas(height, theme)
     draw = ImageDraw.Draw(image)
 
     source_id = events[0][1].source_id
     vendor_color = VENDOR_COLORS.get(source_id, "#386A8A")
     draw.rounded_rectangle(
         (54, 44, 126, 116),
-        radius=16,
-        fill=SURFACE,
-        outline=BORDER,
+        radius=theme.badge_radius,
+        fill=theme.icon_surface,
+        outline=theme.border,
         width=1,
     )
     _paste_icon(image, _vendor_icon(source_id), (70, 60), 40, vendor_color)
@@ -924,7 +1094,7 @@ def render_alert_card(
         source_name_lines,
         (150, 42),
         _font(40, True),
-        TEXT,
+        theme.text,
         48,
     )
     header_subtitle = {
@@ -932,7 +1102,7 @@ def render_alert_card(
         "en-US": "Official vendor status update",
         "bilingual": "厂商官方状态更新  /  Official vendor update",
     }[language]
-    draw.text((152, 91), header_subtitle, font=_font(20), fill=MUTED)
+    draw.text((152, 91), header_subtitle, font=_font(20), fill=theme.muted)
 
     source_url = events[0][1].status_url
     source_host = urlparse(source_url).netloc or "official status page"
@@ -941,8 +1111,8 @@ def render_alert_card(
         "en-US": "Official source",
         "bilingual": "官方来源  /  Official source",
     }[language]
-    draw.text((812, 46), source_label, font=_font(15, True), fill=MUTED)
-    draw.text((812, 72), source_host, font=_font(21, True), fill=TEXT_SOFT)
+    draw.text((812, 46), source_label, font=_font(15, True), fill=theme.muted)
+    draw.text((812, 72), source_host, font=_font(21, True), fill=theme.text_soft)
     count_label = (
         f"本次 {len(events)} 项变更"
         if language == "zh-CN"
@@ -950,9 +1120,9 @@ def render_alert_card(
     )
     if language == "bilingual":
         count_label = f"本次 {len(events)} 项变更  /  {len(events)} change(s)"
-    draw.text((812, 100), count_label, font=_font(16), fill=MUTED)
+    draw.text((812, 100), count_label, font=_font(16), fill=theme.muted)
     draw.rectangle((54, 136, 272, 140), fill=vendor_color)
-    draw.rectangle((272, 137, WIDTH - 54, 139), fill=BORDER)
+    draw.rectangle((272, 137, WIDTH - 54, 139), fill=theme.border)
 
     y = 164
     for event_index, layout in enumerate(layouts, start=1):
@@ -961,17 +1131,17 @@ def render_alert_card(
         assert isinstance(issue, Issue)
         block_height = int(layout["height"])
         severity = "operational" if stage == "recovered" else issue.severity
-        accent = SEVERITY_COLORS.get(severity, SEVERITY_COLORS["warning"])
-        _draw_panel(image, (54, y, WIDTH - 54, y + block_height))
+        accent = theme.severity_colors.get(severity, theme.severity_colors["warning"])
+        _draw_panel(image, (54, y, WIDTH - 54, y + block_height), theme)
         draw = ImageDraw.Draw(image)
         draw.rectangle((54, y + 16, 59, y + block_height - 16), fill=accent)
         draw.text(
             (82, y + 25),
             f"{event_index:02d}",
             font=_font(17, True),
-            fill=MUTED,
+            fill=theme.muted,
         )
-        draw.line((116, y + 24, 116, y + 50), fill=BORDER, width=1)
+        draw.line((116, y + 24, 116, y + 50), fill=theme.border, width=1)
         _paste_icon(image, _stage_icon(stage), (136, y + 27), 18, accent)
         draw.text(
             (166, y + 23),
@@ -993,18 +1163,23 @@ def render_alert_card(
 
         cursor = y + 82
         cursor = _draw_lines(
-            draw, layout["title_lines"], (82, cursor), _font(36, True), TEXT, 47
+            draw,
+            layout["title_lines"],
+            (82, cursor),
+            _font(36, True),
+            theme.text,
+            47,
         )
         original_lines = layout["title_original_lines"]
         if original_lines:
             cursor = _draw_lines(
-                draw, original_lines, (82, cursor), _font(20), MUTED, 27
+                draw, original_lines, (82, cursor), _font(20), theme.muted, 27
             )
 
         service_lines = layout["service_lines"]
         if service_lines:
             cursor += 20
-            draw.line((82, cursor, WIDTH - 82, cursor), fill=BORDER, width=1)
+            draw.line((82, cursor, WIDTH - 82, cursor), fill=theme.border, width=1)
             cursor += 20
             _paste_icon(image, "service", (82, cursor + 1), 20, accent)
             service_heading = (
@@ -1014,17 +1189,22 @@ def render_alert_card(
                 (112, cursor - 2),
                 service_heading,
                 font=_font(17, True),
-                fill=TEXT_SOFT,
+                fill=theme.text_soft,
             )
             if language == "bilingual":
                 draw.text(
                     (112, cursor + 20),
                     "Affected services",
                     font=_font(14),
-                    fill=MUTED,
+                    fill=theme.muted,
                 )
             content_cursor = _draw_lines(
-                draw, service_lines, (280, cursor - 3), _font(23), TEXT_SOFT, 32
+                draw,
+                service_lines,
+                (280, cursor - 3),
+                _font(23),
+                theme.text_soft,
+                32,
             )
             service_original_lines = layout["service_original_lines"]
             if service_original_lines:
@@ -1033,7 +1213,7 @@ def render_alert_card(
                     service_original_lines,
                     (280, content_cursor),
                     _font(18),
-                    MUTED,
+                    theme.muted,
                     25,
                 )
             label_height = 43 if language == "bilingual" else 28
@@ -1042,24 +1222,29 @@ def render_alert_card(
         detail_lines = layout["detail_lines"]
         if detail_lines:
             cursor += 20
-            draw.line((82, cursor, WIDTH - 82, cursor), fill=BORDER, width=1)
+            draw.line((82, cursor, WIDTH - 82, cursor), fill=theme.border, width=1)
             cursor += 20
             detail_heading = "Official note" if language == "en-US" else "官方说明"
             draw.text(
                 (82, cursor - 2),
                 detail_heading,
                 font=_font(17, True),
-                fill=TEXT_SOFT,
+                fill=theme.text_soft,
             )
             if language == "bilingual":
                 draw.text(
                     (82, cursor + 20),
                     "Official note",
                     font=_font(14),
-                    fill=MUTED,
+                    fill=theme.muted,
                 )
             content_cursor = _draw_lines(
-                draw, detail_lines, (280, cursor - 3), _font(23), TEXT_SOFT, 32
+                draw,
+                detail_lines,
+                (280, cursor - 3),
+                _font(23),
+                theme.text_soft,
+                32,
             )
             detail_original_lines = layout["detail_original_lines"]
             if detail_original_lines:
@@ -1068,21 +1253,25 @@ def render_alert_card(
                     detail_original_lines,
                     (280, content_cursor),
                     _font(18),
-                    MUTED,
+                    theme.muted,
                     25,
                 )
             label_height = 43 if language == "bilingual" else 28
             cursor = max(cursor + label_height, content_cursor)
 
         meta_y = y + block_height - 45
-        draw.line((82, meta_y - 15, WIDTH - 82, meta_y - 15), fill="#E6E3DC", width=1)
+        draw.line(
+            (82, meta_y - 15, WIDTH - 82, meta_y - 15),
+            fill=theme.divider,
+            width=1,
+        )
         if issue.updated_at:
-            _paste_icon(image, "clock", (82, meta_y), 18, MUTED)
+            _paste_icon(image, "clock", (82, meta_y), 18, theme.muted)
             draw.text(
                 (110, meta_y - 2),
                 _format_event_time(issue.updated_at, display_timezone),
                 font=_font(17),
-                fill=MUTED,
+                fill=theme.muted,
             )
         if issue.status_url:
             parsed = urlparse(issue.status_url)
@@ -1091,11 +1280,16 @@ def render_alert_card(
                 url_text = f"{parsed.scheme}://{parsed.netloc}/…"
             url_width = _text_width(url_text, _font(17))
             link_x = WIDTH - 82 - int(url_width)
-            _paste_icon(image, "link", (link_x - 27, meta_y), 18, "#315F7C")
-            draw.text((link_x, meta_y - 2), url_text, font=_font(17), fill="#315F7C")
+            _paste_icon(image, "link", (link_x - 27, meta_y), 18, theme.link)
+            draw.text(
+                (link_x, meta_y - 2),
+                url_text,
+                font=_font(17),
+                fill=theme.link,
+            )
         y += block_height + 20
 
-    _draw_project_footer(image, height - 40)
+    _draw_project_footer(image, height - 40, theme)
     output = BytesIO()
     image.convert("RGB").save(output, format="PNG", optimize=True)
     return output.getvalue()
@@ -1106,6 +1300,7 @@ def render_overview(
     translations: dict[str, str] | None = None,
     language: str = "bilingual",
     generated_at: datetime | None = None,
+    card_theme: str = DEFAULT_CARD_THEME,
 ) -> bytes:
     """Render current status of all enabled sources into one bilingual PNG image.
 
@@ -1114,6 +1309,7 @@ def render_overview(
         translations: Original official strings mapped to Chinese translations.
         language: ``zh-CN``, ``en-US``, or ``bilingual``.
         generated_at: Timezone-aware time used for the timestamp heading.
+        card_theme: Configured visual theme identifier.
 
     Returns:
         Encoded PNG bytes.
@@ -1121,6 +1317,7 @@ def render_overview(
     language = normalize_language(language)
     translations = translations or {}
     generated_at = generated_at or datetime.now().astimezone()
+    theme = CARD_THEMES[normalize_card_theme(card_theme)]
     rows: list[dict[str, object]] = []
     for result in results:
         primary_lines: list[str] = []
@@ -1157,13 +1354,13 @@ def render_overview(
     table_header_height = 50
     table_height = table_header_height + sum(int(row["height"]) for row in rows)
     height = 144 + table_height + 68
-    image = _new_canvas(height)
+    image = _new_canvas(height, theme)
     draw = ImageDraw.Draw(image)
     draw.text(
         (52, 48),
         _format_overview_date(generated_at, language),
         font=_font(43, True),
-        fill=TEXT,
+        fill=theme.text,
     )
     count_text = (
         f"监控来源  {len(results):02d}"
@@ -1172,18 +1369,23 @@ def render_overview(
     )
     if language == "bilingual":
         count_text = f"监控来源 / Sources  {len(results):02d}"
-    draw.text((878, 52), count_text, font=_font(18, True), fill=TEXT_SOFT)
+    draw.text((878, 52), count_text, font=_font(18, True), fill=theme.text_soft)
     live_text = {
         "zh-CN": "实时查询 · 官方状态接口",
         "en-US": "Live query · Official status APIs",
         "bilingual": "实时查询 / Live query · Official APIs",
     }[language]
-    draw.text((878, 86), live_text, font=_font(16), fill=MUTED)
-    draw.rectangle((52, 118, 300, 122), fill="#222B34")
-    draw.rectangle((300, 119, WIDTH - 52, 121), fill=BORDER)
+    draw.text((878, 86), live_text, font=_font(16), fill=theme.muted)
+    draw.rectangle((52, 118, 300, 122), fill=theme.chrome)
+    draw.rectangle((300, 119, WIDTH - 52, 121), fill=theme.border)
 
     table_y = 144
-    _draw_panel(image, (52, table_y, WIDTH - 52, table_y + table_height), radius=14)
+    _draw_panel(
+        image,
+        (52, table_y, WIDTH - 52, table_y + table_height),
+        theme,
+        radius=theme.table_radius,
+    )
     draw = ImageDraw.Draw(image)
     column_labels = {
         "zh-CN": ("厂商", "事件摘要", "当前状态"),
@@ -1194,16 +1396,39 @@ def render_overview(
             "当前状态 / Status",
         ),
     }[language]
-    draw.text((80, table_y + 15), column_labels[0], font=_font(15, True), fill=MUTED)
-    draw.text((488, table_y + 15), column_labels[1], font=_font(15, True), fill=MUTED)
-    draw.text((916, table_y + 15), column_labels[2], font=_font(15, True), fill=MUTED)
+    draw.text(
+        (80, table_y + 15),
+        column_labels[0],
+        font=_font(15, True),
+        fill=theme.muted,
+    )
+    draw.text(
+        (488, table_y + 15),
+        column_labels[1],
+        font=_font(15, True),
+        fill=theme.muted,
+    )
+    draw.text(
+        (916, table_y + 15),
+        column_labels[2],
+        font=_font(15, True),
+        fill=theme.muted,
+    )
     draw.line(
         (52, table_y + table_header_height, WIDTH - 52, table_y + table_header_height),
-        fill=BORDER,
+        fill=theme.border,
         width=1,
     )
-    draw.line((460, table_y, 460, table_y + table_height), fill="#E2DFD8", width=1)
-    draw.line((888, table_y, 888, table_y + table_height), fill="#E2DFD8", width=1)
+    draw.line(
+        (460, table_y, 460, table_y + table_height),
+        fill=theme.divider,
+        width=1,
+    )
+    draw.line(
+        (888, table_y, 888, table_y + table_height),
+        fill=theme.divider,
+        width=1,
+    )
 
     y = table_y + table_header_height
     for index, row in enumerate(rows):
@@ -1211,34 +1436,36 @@ def render_overview(
         row_height = int(row["height"])
         draw = ImageDraw.Draw(image)
         if result is None:
-            draw.rectangle((53, y, WIDTH - 53, y + row_height), fill=SURFACE_ALT)
-            _paste_icon(image, "unavailable", (82, y + 29), 38, MUTED)
+            draw.rectangle((53, y, WIDTH - 53, y + row_height), fill=theme.surface_alt)
+            _paste_icon(image, "unavailable", (82, y + 29), 38, theme.muted)
             empty_text = (
                 "没有启用任何状态来源"
                 if language != "en-US"
                 else "No status sources enabled"
             )
-            draw.text((144, y + 31), empty_text, font=_font(24), fill=MUTED)
+            draw.text((144, y + 31), empty_text, font=_font(24), fill=theme.muted)
             y += row_height
             continue
         assert isinstance(result, SourceResult)
         severity = result.severity
-        accent = SEVERITY_COLORS.get(severity, SEVERITY_COLORS["unavailable"])
-        row_fill = SURFACE if index % 2 == 0 else SURFACE_ALT
+        accent = theme.severity_colors.get(
+            severity, theme.severity_colors["unavailable"]
+        )
+        row_fill = theme.surface if index % 2 == 0 else theme.surface_alt
         if severity == "critical":
-            row_fill = "#FBF0F1"
+            row_fill = theme.critical_surface
         elif severity == "warning":
-            row_fill = "#FCF6E9"
+            row_fill = theme.warning_surface
         elif not result.success:
-            row_fill = "#F1F2F2"
+            row_fill = theme.unavailable_surface
         draw.rectangle((53, y, WIDTH - 53, y + row_height), fill=row_fill)
         row_center = y + row_height // 2
         vendor_color = VENDOR_COLORS.get(result.spec.source_id, "#386A8A")
         draw.rounded_rectangle(
             (80, row_center - 28, 136, row_center + 28),
-            radius=13,
-            fill=SURFACE,
-            outline=BORDER,
+            radius=theme.badge_radius,
+            fill=theme.icon_surface,
+            outline=theme.border,
             width=1,
         )
         _paste_icon(
@@ -1261,7 +1488,7 @@ def render_overview(
             vendor_name_lines,
             (156, vendor_cursor),
             _font(22, True),
-            TEXT,
+            theme.text,
             27,
         )
         source_kind = {
@@ -1273,7 +1500,7 @@ def render_overview(
             (156, vendor_cursor + 2),
             source_kind,
             font=_font(15),
-            fill=MUTED,
+            fill=theme.muted,
         )
 
         if result.success:
@@ -1313,7 +1540,7 @@ def render_overview(
                 primary_lines,
                 (488, y + 43),
                 _font(21, True),
-                TEXT_SOFT,
+                theme.text_soft,
                 28,
             )
             if original_lines:
@@ -1322,7 +1549,7 @@ def render_overview(
                     original_lines,
                     (488, cursor),
                     _font(16),
-                    MUTED,
+                    theme.muted,
                     22,
                 )
         else:
@@ -1337,7 +1564,7 @@ def render_overview(
                 summary_lines,
                 (488, row_center - len(summary_lines) * 12),
                 _font(17),
-                MUTED,
+                theme.muted,
                 24,
             )
 
@@ -1361,12 +1588,20 @@ def render_overview(
         )
         y += row_height
         if index < len(rows) - 1:
-            draw.line((52, y, WIDTH - 52, y), fill=BORDER, width=1)
+            draw.line((52, y, WIDTH - 52, y), fill=theme.border, width=1)
 
-    draw.line((460, table_y, 460, table_y + table_height), fill="#E2DFD8", width=1)
-    draw.line((888, table_y, 888, table_y + table_height), fill="#E2DFD8", width=1)
+    draw.line(
+        (460, table_y, 460, table_y + table_height),
+        fill=theme.divider,
+        width=1,
+    )
+    draw.line(
+        (888, table_y, 888, table_y + table_height),
+        fill=theme.divider,
+        width=1,
+    )
 
-    _draw_project_footer(image, height - 40)
+    _draw_project_footer(image, height - 40, theme)
     output = BytesIO()
     image.convert("RGB").save(output, format="PNG", optimize=True)
     return output.getvalue()

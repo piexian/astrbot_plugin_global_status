@@ -52,6 +52,24 @@
     "default": "bilingual",
     "hint": "双语模式优先显示中文译文，并在下方保留官方英文原文。"
   },
+  "card_theme": {
+    "description": "状态图片主题",
+    "type": "string",
+    "options": [
+      "paper",
+      "midnight",
+      "porcelain",
+      "terminal"
+    ],
+    "labels": [
+      "纸质公报（默认）",
+      "午夜蓝图",
+      "青瓷云笺",
+      "荧光终端"
+    ],
+    "default": "paper",
+    "hint": "同时应用于厂商异常告警卡和 /厂商状态 总览图。"
+  },
   "timezone": {
     "description": "状态图片时间时区",
     "type": "string",

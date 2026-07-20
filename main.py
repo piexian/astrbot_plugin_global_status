@@ -382,6 +382,7 @@ class GlobalStatusMonitor(star.Star):
                 translations,
                 language,
                 display_timezone,
+                str(self.config.get("card_theme", "paper")),
             )
             chain = MessageChain([Image.fromBytes(png)])
         except Exception:
@@ -542,6 +543,7 @@ class GlobalStatusMonitor(star.Star):
                 translations,
                 normalize_language(self.config.get("display_language", "bilingual")),
                 self._display_datetime(),
+                str(self.config.get("card_theme", "paper")),
             )
             if self._translator.dirty:
                 await self.put_kv_data(
