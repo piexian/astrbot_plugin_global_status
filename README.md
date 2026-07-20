@@ -1,6 +1,6 @@
 # AstrBot 全球厂商状态监控
 
-面向 `aiocqhttp` / OneBot v11 的主动状态告警插件。插件轮询官方状态接口，在服务出现异常、异常信息更新或恢复时生成精美的 PNG 状态卡并推送到指定 QQ 群。卡片图标全部来自插件内置 SVG 资产，运行时在内存中栅格化，不需要 Cairo 等原生依赖。
+面向所有具备群聊和主动推送能力的 AstrBot 平台适配器的状态告警插件。插件轮询官方状态接口，在服务出现异常、异常信息更新或恢复时生成精美的 PNG 状态卡并推送到指定群。卡片图标全部来自插件内置 SVG 资产，运行时在内存中栅格化，不需要 Cairo 等原生依赖。
 
 ## 图片示例
 
@@ -31,17 +31,36 @@ OpenAI、Claude、Groq、Cohere、Moonshot AI、MiniMax、DeepSeek、GitHub 和 
 
 在 AstrBot WebUI 的插件配置中填写：
 
-1. `group_whitelist`：允许接收告警的 QQ 群号。默认值为空，因此刚安装时不会主动发送。
-2. `platform_id`：通常保持为空。只有一个 aiocqhttp 实例时插件会自动选择；存在多个实例时必须明确填写。
-3. `poll_interval_seconds`：默认 300 秒，最低 60 秒。
-4. `sources`：可单独停用任意内置来源。
-5. `notify_maintenance`：默认关闭，计划维护不会被当作服务故障。
-6. `notify_existing_on_first_startup`：控制首次成功查询时是否推送厂商已有异常，默认开启。关闭时只建立状态基线，之后的更新和恢复仍会通知。
-7. `display_language`：支持 `中英双语`、`简体中文` 和 `English`，默认中英双语。
-8. `card_theme`：选择告警卡与总览图主题，提供 `纸质公报`、`午夜蓝图`、`青瓷云笺`、`荧光终端`、`液态玻璃` 五种样式，默认使用纸质公报。
-9. `timezone`：控制总览图及告警卡内所有时间所使用的时区，统一精确到秒并显示 UTC 偏移。默认留空并跟随 AstrBot 全局“时区”设置；也可填写 `Asia/Shanghai` 等 IANA 时区名称单独覆盖。
-10. `enable_ai_translation`：默认开启，调用 AstrBot 默认对话模型把官方英文事件翻译为简体中文。
-11. `translation_provider_id`：通常留空；留空时使用默认对话模型，也可以为翻译单独选择模型。
+1. `platform_type`：推送平台类型，可选 `aiocqhttp`（默认）或 `qq_official`。
+2. `group_whitelist`：允许接收告警的目标白名单。支持三种格式：纯数字群号（aiocqhttp）、group_openid（qq_official）、完整 UMO（任意平台）。默认值为空，因此刚安装时不会主动发送。
+
+   **获取 UMO**：在目标群中向机器人发送 `/sid`，机器人会回复类似以下内容：
+
+   ```
+   UMO: 「1:GroupMessage:123456789」
+   UID: 「10001」
+   ...
+   Platform ID: 「1」
+   Message Type: 「GroupMessage」
+   Session ID: 「123456789」
+   ```
+
+   将 `UMO:` 后面引号内的完整字符串（如 `1:GroupMessage:123456789`）填入白名单即可。UMO 格式为 `平台实例ID:消息类型:会话ID`，具有全局唯一性，填写后无需再配置 `platform_id` 和 `platform_type`。
+
+   示例：
+   - aiocqhttp 群号：`123456789`
+   - qq_official 群 openid：`E4BE1234ABCD5678`
+   - 完整 UMO：`1:GroupMessage:123456789`
+3. `platform_id`：仅对纯群号/group_openid 条目生效（用于拼接 UMO）。如果白名单中全部使用完整 UMO 格式，此项无需填写。留空时自动选择对应类型下唯一的活跃实例；存在多个实例时必须明确填写。
+4. `poll_interval_seconds`：默认 300 秒，最低 60 秒。
+5. `sources`：可单独停用任意内置来源。
+6. `notify_maintenance`：默认关闭，计划维护不会被当作服务故障。
+7. `notify_existing_on_first_startup`：控制首次成功查询时是否推送厂商已有异常，默认开启。关闭时只建立状态基线，之后的更新和恢复仍会通知。
+8. `display_language`：支持 `中英双语`、`简体中文` 和 `English`，默认中英双语。
+9. `card_theme`：选择告警卡与总览图主题，提供 `纸质公报`、`午夜蓝图`、`青瓷云笺`、`荧光终端`、`液态玻璃` 五种样式，默认使用纸质公报。
+10. `timezone`：控制总览图及告警卡内所有时间所使用的时区，统一精确到秒并显示 UTC 偏移。默认留空并跟随 AstrBot 全局"时区"设置；也可填写 `Asia/Shanghai` 等 IANA 时区名称单独覆盖。
+11. `enable_ai_translation`：默认开启，调用 AstrBot 默认对话模型把官方英文事件翻译为简体中文。
+12. `translation_provider_id`：通常留空；留空时使用默认对话模型，也可以为翻译单独选择模型。
 
 ### 图片主题
 
@@ -66,7 +85,7 @@ OpenAI、Claude、Groq、Cohere、Moonshot AI、MiniMax、DeepSeek、GitHub 和 
 - `/厂商状态`
 - `/vendor_status`
 
-以上命令行为相同：收到指令后立即抓取所有启用来源并返回最新状态总览图，不会修改自动告警的去重或送达状态。命令仅在 aiocqhttp 平台生效，群聊和私聊均可使用。
+以上命令行为相同：收到指令后立即抓取所有启用来源并返回最新状态总览图，不会修改自动告警的去重或送达状态。命令目前在 aiocqhttp 和 qq_official 平台生效，群聊和私聊均可使用。
 
 ## 通知规则
 
@@ -84,8 +103,15 @@ OpenAI、Claude、Google Vertex AI / Gemini、Groq、Cohere、Moonshot AI、Mini
 
 ## 故障排查
 
-- 没有主动消息：确认 `group_whitelist` 非空、群号为纯数字，并确认 aiocqhttp 已连接。
-- 多个 aiocqhttp 实例：在 `platform_id` 中填写目标实例 ID。
-- 状态查询显示“数据不可用”：检查 AstrBot 日志、网络连接和全局代理配置。
+- 没有主动消息：确认 `group_whitelist` 非空，并确认对应平台已连接。
+- 多个同类型实例：在 `platform_id` 中填写目标实例 ID。
+- 状态查询显示"数据不可用"：检查 AstrBot 日志、网络连接和全局代理配置。
 - 图片没有中文译文：确认已启用 AI 翻译并配置了可用的默认对话模型；详细原因会记录在 AstrBot 日志中。
 - 中文显示为方框：可在 AstrBot `data/font.ttf` 放置支持中文的字体。插件也会自动尝试微软雅黑、Noto CJK 和苹方。
+
+## 已知限制
+
+- **平台兼容性**：插件推送仅依赖 `Image` 消息组件和 `context.send_message()`，理论上所有支持群聊 + 主动推送 + 发图的适配器均可使用（见 `metadata.yaml` 中 `support_platforms` 列表）。但目前仅在 **aiocqhttp** 和 **qq_official** 上经过实际测试验证，其他平台填 UMO 后理论上可用，如遇问题请反馈。
+- **QQ 官方机器人群主动推送需要前置交互**：QQ 官方 API 的群消息发送依赖适配器内存中缓存的会话场景（`scene="group"`）。AstrBot 重启后缓存清空，在机器人再次收到该群的消息之前，主动推送会被适配器静默跳过（日志中会出现 `[QQOfficial] No cached msg_id for session` 警告）。这是 QQ 官方 API 的设计约束，非插件 bug。解决方法：确保机器人在目标群中至少被 @ 过一次（或收到过群消息），之后的主动推送即可正常工作。
+- **不支持的平台**：微信公众号（无主动推送）、微信客服（无群聊）、WebChat（无群聊）不支持本插件的主动告警功能。
+- **企业微信仅应用模式可用**：`wecom` 适配器在客服模式（kf）下不支持主动发送群消息，`send_by_session` 会直接抛异常。请确保企业微信配置为应用模式后再使用本插件推送。
