@@ -103,9 +103,7 @@ def test_image_timezone_override_and_astrbot_default():
 
     plugin.config["timezone"] = "America/New_York"
     assert plugin._display_timezone_name() == "America/New_York"
-    assert getattr(plugin._display_datetime().tzinfo, "key", "") == (
-        "America/New_York"
-    )
+    assert getattr(plugin._display_datetime().tzinfo, "key", "") == ("America/New_York")
 
 
 def test_reconcile_initial_update_dedup_and_recovery():
@@ -324,9 +322,7 @@ async def test_first_startup_can_baseline_existing_incidents_without_sending(
 
 @pytest.mark.asyncio
 async def test_empty_whitelist_updates_state_without_sending(monkeypatch):
-    plugin = _plugin(
-        {"enabled": True, "group_whitelist": [], "platform_id": ""}
-    )
+    plugin = _plugin({"enabled": True, "group_whitelist": [], "platform_id": ""})
     issue = _issue()
 
     async def fetch_sources():

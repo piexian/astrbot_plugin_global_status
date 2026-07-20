@@ -36,7 +36,12 @@ def test_parse_statuspage_deduplicates_incident_components_and_filters_maintenan
             {"id": "api", "name": "API", "status": "major_outage"},
             {"id": "web", "name": "Web", "status": "degraded_performance"},
             {"id": "maint", "name": "Region A", "status": "under_maintenance"},
-            {"id": "group", "name": "Products", "status": "partial_outage", "group": True},
+            {
+                "id": "group",
+                "name": "Products",
+                "status": "partial_outage",
+                "group": True,
+            },
         ],
     }
     incidents = {
@@ -167,8 +172,16 @@ def test_build_source_specs_validates_and_deduplicates_custom_sources():
     specs = build_source_specs(
         {"openai": True, "claude": False},
         [
-            {"name": "Custom", "base_url": "https://status.custom.test", "enabled": True},
-            {"name": "Duplicate", "base_url": "https://status.openai.com", "enabled": True},
+            {
+                "name": "Custom",
+                "base_url": "https://status.custom.test",
+                "enabled": True,
+            },
+            {
+                "name": "Duplicate",
+                "base_url": "https://status.openai.com",
+                "enabled": True,
+            },
             {"name": "Invalid", "base_url": "not-a-url", "enabled": True},
         ],
     )

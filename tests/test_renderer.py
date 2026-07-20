@@ -35,7 +35,8 @@ def test_render_alert_card_returns_valid_dynamic_png():
         severity="critical",
         title="Elevated errors affecting API requests",
         affected_services=("API", "ChatGPT", "Responses"),
-        detail="We are investigating elevated error rates affecting a subset of requests. " * 8,
+        detail="We are investigating elevated error rates affecting a subset of requests. "
+        * 8,
         updated_at="2026-07-20T01:00:00Z",
         status_url="https://status.openai.com/",
     )
@@ -132,9 +133,7 @@ def test_all_card_themes_render_alerts_and_overviews():
                 )
             )
         )
-        overview = Image.open(
-            BytesIO(render_overview([result], card_theme=theme_name))
-        )
+        overview = Image.open(BytesIO(render_overview([result], card_theme=theme_name)))
 
         assert alert.format == "PNG"
         assert overview.format == "PNG"
@@ -161,9 +160,7 @@ def test_bilingual_alert_preserves_english_and_localizes_fallback():
     }
 
     for language in ("zh-CN", "en-US", "bilingual"):
-        data = render_alert_card(
-            "OpenAI", [("update", issue)], translations, language
-        )
+        data = render_alert_card("OpenAI", [("update", issue)], translations, language)
         image = Image.open(BytesIO(data))
         assert image.format == "PNG"
         assert image.width == 1200
@@ -177,8 +174,7 @@ def test_bilingual_alert_preserves_english_and_localizes_fallback():
 
 def test_long_custom_vendor_name_is_bounded_in_alert_header():
     source_name = (
-        "A Very Long Custom Statuspage Vendor Name / "
-        "超长自定义厂商名称用于边界压力测试"
+        "A Very Long Custom Statuspage Vendor Name / 超长自定义厂商名称用于边界压力测试"
     )
     source_name_lines = _wrap_text(source_name, _font(40, True), 610, 1)
     issue = Issue(
@@ -247,14 +243,7 @@ def test_render_overview_includes_operational_and_unavailable_rows():
     assert image.size[0] == 1200
     assert image.size[1] >= 400
     assert (
-        _format_overview_date(generated_at, "bilingual")
-        == "2026年07月20日  13:00:00"
+        _format_overview_date(generated_at, "bilingual") == "2026年07月20日  13:00:00"
     )
-    assert (
-        _format_overview_date(generated_at, "zh-CN")
-        == "2026年07月20日  13:00:00"
-    )
-    assert (
-        _format_overview_date(generated_at, "en-US")
-        == "JULY 20, 2026  13:00:00"
-    )
+    assert _format_overview_date(generated_at, "zh-CN") == "2026年07月20日  13:00:00"
+    assert _format_overview_date(generated_at, "en-US") == "JULY 20, 2026  13:00:00"

@@ -50,6 +50,7 @@ class CardTheme:
     panel_radius: int
     badge_radius: int
     table_radius: int
+    liquid_glass: bool = False
 
 
 CARD_THEMES: dict[str, CardTheme] = {
@@ -172,6 +173,37 @@ CARD_THEMES: dict[str, CardTheme] = {
         panel_radius=2,
         badge_radius=2,
         table_radius=2,
+    ),
+    "liquid_glass": CardTheme(
+        background_top="#E9E9E7",
+        background_bottom="#DCDDDC",
+        surface="#FFFFFFA6",
+        surface_alt="#F4F4F28C",
+        icon_surface="#FAFAF8",
+        text="#18191B",
+        text_soft="#3F4246",
+        muted="#70747A",
+        border="#C8CBCD",
+        panel_highlight="#FFFFFF",
+        chrome="#242629",
+        divider="#C9CCCE",
+        link="#0068D9",
+        footer="#777B80",
+        critical_surface="#FFE8EBA6",
+        warning_surface="#FFF3DDA6",
+        unavailable_surface="#E9EBECA6",
+        severity_colors={
+            "critical": "#C82035",
+            "warning": "#9B6100",
+            "maintenance": "#0068D9",
+            "info": "#0068D9",
+            "operational": "#18794E",
+            "unavailable": "#6F7479",
+        },
+        panel_radius=28,
+        badge_radius=22,
+        table_radius=26,
+        liquid_glass=True,
     ),
 }
 
@@ -849,6 +881,27 @@ def _new_canvas(height: int, theme: CardTheme) -> Image.Image:
     return image
 
 
+def _fill_rectangle(
+    image: Image.Image,
+    bounds: tuple[int, int, int, int],
+    fill: str,
+) -> None:
+    """Draw an opaque or alpha-composited rectangle onto an RGBA image.
+
+    Args:
+        image: Target RGBA image.
+        bounds: Rectangle coordinates in ``(left, top, right, bottom)`` order.
+        fill: Pillow-compatible color string, optionally including alpha.
+    """
+    color = ImageColor.getcolor(fill, "RGBA")
+    if color[3] == 255:
+        ImageDraw.Draw(image).rectangle(bounds, fill=color)
+        return
+    overlay = Image.new("RGBA", image.size, (0, 0, 0, 0))
+    ImageDraw.Draw(overlay).rectangle(bounds, fill=color)
+    image.alpha_composite(overlay)
+
+
 def _draw_panel(
     image: Image.Image,
     bounds: tuple[int, int, int, int],
@@ -857,15 +910,35 @@ def _draw_panel(
     radius: int | None = None,
 ) -> None:
     x1, y1, x2, y2 = bounds
-    draw = ImageDraw.Draw(image)
     panel_radius = theme.panel_radius if radius is None else radius
-    draw.rounded_rectangle(
-        bounds,
-        radius=panel_radius,
-        fill=fill or theme.surface,
-        outline=theme.border,
-        width=1,
-    )
+    panel_fill = fill or theme.surface
+    fill_color = ImageColor.getcolor(panel_fill, "RGBA")
+    if fill_color[3] < 255:
+        overlay = Image.new("RGBA", image.size, (0, 0, 0, 0))
+        overlay_draw = ImageDraw.Draw(overlay)
+        if theme.liquid_glass:
+            overlay_draw.rounded_rectangle(
+                (x1 + 3, y1 + 8, x2 + 3, y2 + 8),
+                radius=panel_radius,
+                fill=(16, 18, 20, 28),
+            )
+        overlay_draw.rounded_rectangle(
+            bounds,
+            radius=panel_radius,
+            fill=fill_color,
+            outline=ImageColor.getcolor(theme.border, "RGBA"),
+            width=1,
+        )
+        image.alpha_composite(overlay)
+    else:
+        ImageDraw.Draw(image).rounded_rectangle(
+            bounds,
+            radius=panel_radius,
+            fill=fill_color,
+            outline=theme.border,
+            width=1,
+        )
+    draw = ImageDraw.Draw(image)
     draw.line(
         (x1 + panel_radius, y1 + 1, x2 - panel_radius, y1 + 1),
         fill=theme.panel_highlight,
@@ -1141,8 +1214,9 @@ def render_alert_card(
     if language == "bilingual":
         count_label = f"本次 {len(events)} 项变更  /  {len(events)} change(s)"
     draw.text((812, 100), count_label, font=_font(16), fill=theme.muted)
-    draw.rectangle((54, 136, 272, 140), fill=vendor_color)
-    draw.rectangle((272, 137, WIDTH - 54, 139), fill=theme.border)
+    _fill_rectangle(image, (54, 136, 272, 140), vendor_color)
+    _fill_rectangle(image, (272, 137, WIDTH - 54, 139), theme.border)
+    draw = ImageDraw.Draw(image)
 
     y = 164
     for event_index, layout in enumerate(layouts, start=1):
@@ -1154,7 +1228,8 @@ def render_alert_card(
         accent = theme.severity_colors.get(severity, theme.severity_colors["warning"])
         _draw_panel(image, (54, y, WIDTH - 54, y + block_height), theme)
         draw = ImageDraw.Draw(image)
-        draw.rectangle((54, y + 16, 59, y + block_height - 16), fill=accent)
+        _fill_rectangle(image, (54, y + 16, 59, y + block_height - 16), accent)
+        draw = ImageDraw.Draw(image)
         draw.text(
             (82, y + 25),
             f"{event_index:02d}",
@@ -1412,8 +1487,9 @@ def render_overview(
         "bilingual": "实时查询 / Live query · Official APIs",
     }[language]
     draw.text((878, 86), live_text, font=_font(16), fill=theme.muted)
-    draw.rectangle((52, 118, 300, 122), fill=theme.chrome)
-    draw.rectangle((300, 119, WIDTH - 52, 121), fill=theme.border)
+    _fill_rectangle(image, (52, 118, 300, 122), theme.chrome)
+    _fill_rectangle(image, (300, 119, WIDTH - 52, 121), theme.border)
+    draw = ImageDraw.Draw(image)
 
     table_y = 144
     _draw_panel(
@@ -1472,7 +1548,12 @@ def render_overview(
         row_height = int(row["height"])
         draw = ImageDraw.Draw(image)
         if result is None:
-            draw.rectangle((53, y, WIDTH - 53, y + row_height), fill=theme.surface_alt)
+            _fill_rectangle(
+                image,
+                (53, y, WIDTH - 53, y + row_height),
+                theme.surface_alt,
+            )
+            draw = ImageDraw.Draw(image)
             _paste_icon(image, "unavailable", (82, y + 29), 38, theme.muted)
             empty_text = (
                 "没有启用任何状态来源"
@@ -1494,7 +1575,8 @@ def render_overview(
             row_fill = theme.warning_surface
         elif not result.success:
             row_fill = theme.unavailable_surface
-        draw.rectangle((53, y, WIDTH - 53, y + row_height), fill=row_fill)
+        _fill_rectangle(image, (53, y, WIDTH - 53, y + row_height), row_fill)
+        draw = ImageDraw.Draw(image)
         row_center = y + row_height // 2
         vendor_color = VENDOR_COLORS.get(result.spec.source_id, "#386A8A")
         draw.rounded_rectangle(

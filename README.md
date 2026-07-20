@@ -6,9 +6,9 @@
 
 以下图片使用演示数据生成，仅用于展示排版和主题效果，不代表厂商真实服务状态。
 
-### 四种主题对比
+### 五种主题对比
 
-[![纸质公报、午夜蓝图、青瓷云笺和荧光终端主题对比](assets/screenshots/themes-comparison.png)](assets/screenshots/themes-comparison.png)
+[![纸质公报、午夜蓝图、青瓷云笺、荧光终端和液态玻璃主题对比](assets/screenshots/themes-comparison.png)](assets/screenshots/themes-comparison.png)
 
 ### 双语异常告警卡
 
@@ -38,7 +38,7 @@ OpenAI、Claude、Groq、Cohere、Moonshot AI、MiniMax、DeepSeek、GitHub 和 
 5. `notify_maintenance`：默认关闭，计划维护不会被当作服务故障。
 6. `notify_existing_on_first_startup`：控制首次成功查询时是否推送厂商已有异常，默认开启。关闭时只建立状态基线，之后的更新和恢复仍会通知。
 7. `display_language`：支持 `中英双语`、`简体中文` 和 `English`，默认中英双语。
-8. `card_theme`：选择告警卡与总览图主题，提供 `纸质公报`、`午夜蓝图`、`青瓷云笺`、`荧光终端` 四种样式，默认使用纸质公报。
+8. `card_theme`：选择告警卡与总览图主题，提供 `纸质公报`、`午夜蓝图`、`青瓷云笺`、`荧光终端`、`液态玻璃` 五种样式，默认使用纸质公报。
 9. `timezone`：控制总览图及告警卡内所有时间所使用的时区，统一精确到秒并显示 UTC 偏移。默认留空并跟随 AstrBot 全局“时区”设置；也可填写 `Asia/Shanghai` 等 IANA 时区名称单独覆盖。
 10. `enable_ai_translation`：默认开启，调用 AstrBot 默认对话模型把官方英文事件翻译为简体中文。
 11. `translation_provider_id`：通常留空；留空时使用默认对话模型，也可以为翻译单独选择模型。
@@ -49,6 +49,7 @@ OpenAI、Claude、Groq、Cohere、Moonshot AI、MiniMax、DeepSeek、GitHub 和 
 - `午夜蓝图`：深海蓝黑底色、紫色结构线与柔和的高亮文字。
 - `青瓷云笺`：浅青瓷底色、更圆润的卡片轮廓与低饱和绿色层次。
 - `荧光终端`：近黑终端底色、直角结构与高对比荧光状态色。
+- `液态玻璃`：仿照 iOS 的中性浅灰背景、半透明白色磨砂层、细高光边和柔和阴影，不使用蓝紫渐变。
 
 插件使用 AstrBot 的全局 `http_proxy` 环境配置访问状态页，无需重复配置代理。
 

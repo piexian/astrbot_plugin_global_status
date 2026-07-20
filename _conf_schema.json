@@ -59,13 +59,15 @@
       "paper",
       "midnight",
       "porcelain",
-      "terminal"
+      "terminal",
+      "liquid_glass"
     ],
     "labels": [
-      "纸质公报（默认）",
+      "纸质公报",
       "午夜蓝图",
       "青瓷云笺",
-      "荧光终端"
+      "荧光终端",
+      "液态玻璃"
     ],
     "default": "paper",
     "hint": "同时应用于厂商异常告警卡和 /厂商状态 总览图。"
