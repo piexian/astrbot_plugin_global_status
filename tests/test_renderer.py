@@ -5,6 +5,7 @@ from PIL import Image
 from data.plugins.astrbot_plugin_global_status.renderer import (
     ICON_DIR,
     PROJECT_SIGNATURE,
+    _event_layout,
     _font,
     _svg_icon,
     _text_width,
@@ -39,7 +40,7 @@ def test_render_alert_card_returns_valid_dynamic_png():
     assert image.format == "PNG"
     assert image.width == 1200
     assert image.height > 500
-    assert PROJECT_SIGNATURE == "Futureppo/astrbot_plugin_global_status"
+    assert PROJECT_SIGNATURE == "github.com/Futureppo/astrbot_plugin_global_status"
 
 
 def test_svg_icon_assets_rasterize_without_native_dependencies():
@@ -125,6 +126,38 @@ def test_long_custom_vendor_name_is_bounded_in_alert_header():
     assert len(source_name_lines) == 1
     assert source_name_lines[0].endswith("…")
     assert _text_width(source_name_lines[0], _font(40, True)) <= 610
+
+
+def test_official_note_is_never_truncated():
+    detail = "Official status update with diagnostic details. " * 80 + "TAIL_MARKER"
+    translated = "包含诊断细节的官方状态更新。" * 80 + "末尾标记"
+    issue = Issue(
+        source_id="cloudflare",
+        source_name="Cloudflare",
+        issue_id="long-note",
+        severity="warning",
+        title="Component status degradation",
+        detail=detail,
+        status_url="https://www.cloudflarestatus.com/",
+    )
+
+    layout = _event_layout(
+        "new",
+        issue,
+        {detail: translated},
+        "bilingual",
+    )
+    data = render_alert_card(
+        "Cloudflare",
+        [("new", issue)],
+        {detail: translated},
+        "bilingual",
+    )
+    image = Image.open(BytesIO(data))
+
+    assert "末尾标记" in "".join(layout["detail_lines"])
+    assert "TAIL_MARKER" in "".join(layout["detail_original_lines"])
+    assert image.height > 1500
 
 
 def test_render_overview_includes_operational_and_unavailable_rows():

@@ -27,7 +27,7 @@ TEXT_SOFT = "#36414C"
 MUTED = "#727B84"
 BORDER = "#D4D1CA"
 ICON_DIR = Path(__file__).parent / "assets" / "icons"
-PROJECT_SIGNATURE = "Futureppo/astrbot_plugin_global_status"
+PROJECT_SIGNATURE = "github.com/Futureppo/astrbot_plugin_global_status"
 
 SEVERITY_COLORS = {
     "critical": "#BD3342",
@@ -659,6 +659,30 @@ def _draw_panel(
     draw.line((x1 + radius, y1 + 1, x2 - radius, y1 + 1), fill="#FFFFFF", width=1)
 
 
+def _draw_project_footer(image: Image.Image, y: int) -> None:
+    """Draw the centered GitHub repository link in the image footer."""
+    draw = ImageDraw.Draw(image)
+    font = _font(17)
+    icon_size = 18
+    gap = 10
+    link_width = _text_width(PROJECT_SIGNATURE, font)
+    footer_width = icon_size + gap + link_width
+    footer_x = (WIDTH - footer_width) / 2
+    _paste_icon(
+        image,
+        "github",
+        (round(footer_x), y + 1),
+        icon_size,
+        "#858B91",
+    )
+    draw.text(
+        (footer_x + icon_size + gap, y - 1),
+        PROJECT_SIGNATURE,
+        font=font,
+        fill="#858B91",
+    )
+
+
 def _localized_pair(
     text: str,
     translations: dict[str, str],
@@ -722,8 +746,13 @@ def _event_layout(
     service_original_lines = _wrap_text(service_original, _font(18), 780, 2)
 
     detail, detail_original = _localized_pair(issue.detail, translations, language)
-    detail_lines = _wrap_text(detail, _font(23), 780, 7)
-    detail_original_lines = _wrap_text(detail_original, _font(18), 780, 5)
+    detail_lines = _wrap_text(detail, _font(23), 780, max(1, len(detail)))
+    detail_original_lines = _wrap_text(
+        detail_original,
+        _font(18),
+        780,
+        max(1, len(detail_original)),
+    )
 
     height = 82 + len(title_lines) * 47 + len(title_original_lines) * 27
     if service_lines:
@@ -779,7 +808,7 @@ def render_alert_card(
     layouts = [
         _event_layout(stage, issue, translations, language) for stage, issue in events
     ]
-    height = 164 + sum(int(layout["height"]) + 20 for layout in layouts) + 96
+    height = 164 + sum(int(layout["height"]) + 20 for layout in layouts) + 68
     image = _new_canvas(height)
     draw = ImageDraw.Draw(image)
 
@@ -965,22 +994,7 @@ def render_alert_card(
             draw.text((link_x, meta_y - 2), url_text, font=_font(17), fill="#315F7C")
         y += block_height + 20
 
-    footer = {
-        "zh-CN": "AstrBot 全球状态监控  ·  数据来自厂商官方状态页",
-        "en-US": "AstrBot Global Status  ·  Official vendor data",
-        "bilingual": "AstrBot 全球状态监控  /  Official vendor data",
-    }[language]
-    footer_width = _text_width(footer, _font(19))
-    draw.text(
-        ((WIDTH - footer_width) / 2, height - 68), footer, font=_font(19), fill=MUTED
-    )
-    signature_width = _text_width(PROJECT_SIGNATURE, _font(17))
-    draw.text(
-        ((WIDTH - signature_width) / 2, height - 37),
-        PROJECT_SIGNATURE,
-        font=_font(17),
-        fill="#858B91",
-    )
+    _draw_project_footer(image, height - 40)
     output = BytesIO()
     image.convert("RGB").save(output, format="PNG", optimize=True)
     return output.getvalue()
@@ -1248,13 +1262,7 @@ def render_overview(
     draw.line((460, table_y, 460, table_y + table_height), fill="#E2DFD8", width=1)
     draw.line((888, table_y, 888, table_y + table_height), fill="#E2DFD8", width=1)
 
-    signature_width = _text_width(PROJECT_SIGNATURE, _font(17))
-    draw.text(
-        ((WIDTH - signature_width) / 2, height - 37),
-        PROJECT_SIGNATURE,
-        font=_font(17),
-        fill="#858B91",
-    )
+    _draw_project_footer(image, height - 40)
     output = BytesIO()
     image.convert("RGB").save(output, format="PNG", optimize=True)
     return output.getvalue()
