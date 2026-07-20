@@ -40,7 +40,7 @@ OpenAI、Claude、Groq、Cohere、GitHub 和 Cloudflare 使用 Statuspage JSON�
 - `/厂商状态`
 - `/vendor_status`
 
-命令会实时查询所有启用来源并返回状态总览图，不会修改自动告警的去重或送达状态。命令仅在 aiocqhttp 平台生效，群聊和私聊均可使用。
+以上命令行为相同：收到指令后立即抓取所有启用来源并返回最新状态总览图，不会修改自动告警的去重或送达状态。命令仅在 aiocqhttp 平台生效，群聊和私聊均可使用。
 
 ## 通知规则
 

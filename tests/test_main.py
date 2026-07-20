@@ -353,8 +353,11 @@ async def test_vendor_status_command_returns_image_without_mutating_state(monkey
     plugin = _plugin()
     result = SourceResult(_spec(), True)
     before = copy.deepcopy(plugin._state)
+    fetch_count = 0
 
     async def fetch_sources():
+        nonlocal fetch_count
+        fetch_count += 1
         return [result]
 
     class DummyEvent:
@@ -372,6 +375,7 @@ async def test_vendor_status_command_returns_image_without_mutating_state(monkey
 
     assert len(responses) == 1
     assert isinstance(responses[0][0], Image)
+    assert fetch_count == 1
     assert plugin._state == before
 
 
