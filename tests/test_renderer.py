@@ -5,7 +5,10 @@ from PIL import Image
 from data.plugins.astrbot_plugin_global_status.renderer import (
     ICON_DIR,
     PROJECT_SIGNATURE,
+    _font,
     _svg_icon,
+    _text_width,
+    _wrap_text,
     build_alert_fallback,
     render_alert_card,
     render_overview,
@@ -96,6 +99,30 @@ def test_bilingual_alert_preserves_english_and_localizes_fallback():
     )
     assert "API 错误率升高" in fallback
     assert "Elevated API errors" in fallback
+
+
+def test_long_custom_vendor_name_is_bounded_in_alert_header():
+    source_name = (
+        "A Very Long Custom Statuspage Vendor Name / "
+        "超长自定义厂商名称用于边界压力测试"
+    )
+    source_name_lines = _wrap_text(source_name, _font(40, True), 610, 1)
+    issue = Issue(
+        source_id="custom_extreme_vendor",
+        source_name=source_name,
+        issue_id="custom-1",
+        severity="critical",
+        title="Major service disruption",
+        status_url="https://status.example.com/",
+    )
+
+    data = render_alert_card(source_name, [("new", issue)])
+    image = Image.open(BytesIO(data))
+
+    assert image.format == "PNG"
+    assert len(source_name_lines) == 1
+    assert source_name_lines[0].endswith("…")
+    assert _text_width(source_name_lines[0], _font(40, True)) <= 610
 
 
 def test_render_overview_includes_operational_and_unavailable_rows():

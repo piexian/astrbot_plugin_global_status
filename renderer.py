@@ -777,33 +777,35 @@ def render_alert_card(
     layouts = [
         _event_layout(stage, issue, translations, language) for stage, issue in events
     ]
-    height = 190 + sum(int(layout["height"]) + 20 for layout in layouts) + 96
+    height = 164 + sum(int(layout["height"]) + 20 for layout in layouts) + 96
     image = _new_canvas(height)
     draw = ImageDraw.Draw(image)
 
     source_id = events[0][1].source_id
     vendor_color = VENDOR_COLORS.get(source_id, "#386A8A")
-    bulletin_label = {
-        "zh-CN": "服务状态公报",
-        "en-US": "Service status bulletin",
-        "bilingual": "服务状态公报  /  Service status bulletin",
-    }[language]
-    draw.text((54, 40), bulletin_label, font=_font(17, True), fill=MUTED)
     draw.rounded_rectangle(
-        (54, 74, 126, 146),
+        (54, 44, 126, 116),
         radius=16,
         fill=SURFACE,
         outline=BORDER,
         width=1,
     )
-    _paste_icon(image, _vendor_icon(source_id), (70, 90), 40, vendor_color)
-    draw.text((150, 72), source_name, font=_font(40, True), fill=TEXT)
+    _paste_icon(image, _vendor_icon(source_id), (70, 60), 40, vendor_color)
+    source_name_lines = _wrap_text(source_name, _font(40, True), 610, 1)
+    _draw_lines(
+        draw,
+        source_name_lines,
+        (150, 42),
+        _font(40, True),
+        TEXT,
+        48,
+    )
     header_subtitle = {
         "zh-CN": "厂商官方状态更新",
         "en-US": "Official vendor status update",
         "bilingual": "厂商官方状态更新  /  Official vendor update",
     }[language]
-    draw.text((152, 121), header_subtitle, font=_font(20), fill=MUTED)
+    draw.text((152, 91), header_subtitle, font=_font(20), fill=MUTED)
 
     source_url = events[0][1].status_url
     source_host = urlparse(source_url).netloc or "official status page"
@@ -812,8 +814,8 @@ def render_alert_card(
         "en-US": "Official source",
         "bilingual": "官方来源  /  Official source",
     }[language]
-    draw.text((812, 76), source_label, font=_font(15, True), fill=MUTED)
-    draw.text((812, 102), source_host, font=_font(21, True), fill=TEXT_SOFT)
+    draw.text((812, 46), source_label, font=_font(15, True), fill=MUTED)
+    draw.text((812, 72), source_host, font=_font(21, True), fill=TEXT_SOFT)
     count_label = (
         f"本次 {len(events)} 项变更"
         if language == "zh-CN"
@@ -821,11 +823,11 @@ def render_alert_card(
     )
     if language == "bilingual":
         count_label = f"本次 {len(events)} 项变更  /  {len(events)} change(s)"
-    draw.text((812, 130), count_label, font=_font(16), fill=MUTED)
-    draw.rectangle((54, 166, 272, 170), fill=vendor_color)
-    draw.rectangle((272, 167, WIDTH - 54, 169), fill=BORDER)
+    draw.text((812, 100), count_label, font=_font(16), fill=MUTED)
+    draw.rectangle((54, 136, 272, 140), fill=vendor_color)
+    draw.rectangle((272, 137, WIDTH - 54, 139), fill=BORDER)
 
-    y = 190
+    y = 164
     for event_index, layout in enumerate(layouts, start=1):
         stage = str(layout["stage"])
         issue = layout["issue"]
@@ -1034,27 +1036,15 @@ def render_overview(
         ]
     table_header_height = 50
     table_height = table_header_height + sum(int(row["height"]) for row in rows)
-    height = 184 + table_height + 96
+    height = 144 + table_height + 68
     image = _new_canvas(height)
     draw = ImageDraw.Draw(image)
-    page_label = {
-        "zh-CN": "全球基础设施状态公报",
-        "en-US": "Global infrastructure bulletin",
-        "bilingual": "全球基础设施状态公报  /  Global infrastructure bulletin",
-    }[language]
-    draw.text((52, 40), page_label, font=_font(17, True), fill=MUTED)
     draw.text(
-        (52, 72),
+        (52, 48),
         "全球厂商服务状态" if language != "en-US" else "Global vendor status",
         font=_font(43, True),
         fill=TEXT,
     )
-    subtitle = {
-        "zh-CN": "AI · 云服务 · 开发者基础设施",
-        "en-US": "AI · Cloud · Developer infrastructure",
-        "bilingual": "AI · 云服务 · Cloud · Developer infrastructure",
-    }[language]
-    draw.text((54, 126), subtitle, font=_font(20), fill=MUTED)
     count_text = (
         f"监控来源  {len(results):02d}"
         if language == "zh-CN"
@@ -1062,17 +1052,17 @@ def render_overview(
     )
     if language == "bilingual":
         count_text = f"监控来源 / Sources  {len(results):02d}"
-    draw.text((878, 78), count_text, font=_font(18, True), fill=TEXT_SOFT)
+    draw.text((878, 52), count_text, font=_font(18, True), fill=TEXT_SOFT)
     live_text = {
         "zh-CN": "实时查询 · 官方状态接口",
         "en-US": "Live query · Official status APIs",
         "bilingual": "实时查询 / Live query · Official APIs",
     }[language]
-    draw.text((878, 112), live_text, font=_font(16), fill=MUTED)
-    draw.rectangle((52, 158, 300, 162), fill="#222B34")
-    draw.rectangle((300, 159, WIDTH - 52, 161), fill=BORDER)
+    draw.text((878, 86), live_text, font=_font(16), fill=MUTED)
+    draw.rectangle((52, 118, 300, 122), fill="#222B34")
+    draw.rectangle((300, 119, WIDTH - 52, 121), fill=BORDER)
 
-    table_y = 184
+    table_y = 144
     _draw_panel(image, (52, table_y, WIDTH - 52, table_y + table_height), radius=14)
     draw = ImageDraw.Draw(image)
     column_labels = {
@@ -1256,15 +1246,6 @@ def render_overview(
     draw.line((460, table_y, 460, table_y + table_height), fill="#E2DFD8", width=1)
     draw.line((888, table_y, 888, table_y + table_height), fill="#E2DFD8", width=1)
 
-    footer = {
-        "zh-CN": "实时查询  ·  数据来自厂商官方状态接口",
-        "en-US": "Live query  ·  Official vendor status APIs",
-        "bilingual": "实时查询 / Live  ·  Official vendor status APIs",
-    }[language]
-    footer_width = _text_width(footer, _font(19))
-    draw.text(
-        ((WIDTH - footer_width) / 2, height - 68), footer, font=_font(19), fill=MUTED
-    )
     signature_width = _text_width(PROJECT_SIGNATURE, _font(17))
     draw.text(
         ((WIDTH - signature_width) / 2, height - 37),
