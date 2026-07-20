@@ -49,6 +49,8 @@ def test_svg_icon_assets_rasterize_without_native_dependencies():
         "google_vertex_gemini",
         "groq",
         "cohere",
+        "xai",
+        "deepseek",
         "aws",
         "azure",
         "github",

@@ -4,12 +4,12 @@
 
 ## 内置来源
 
-- OpenAI、Claude / Anthropic、Groq、Cohere
+- OpenAI、Claude / Anthropic、Groq、Cohere、xAI、DeepSeek
 - Google Vertex AI / Gemini
 - Amazon Web Services、Microsoft Azure
 - GitHub、Cloudflare
 
-OpenAI、Claude、Groq、Cohere、GitHub 和 Cloudflare 使用 Statuspage JSON；Google 使用 Google Cloud 事件 JSON；AWS 和 Azure 使用官方 RSS。还可以在插件配置中添加其他兼容 Statuspage JSON 的状态页。
+OpenAI、Claude、Groq、Cohere、DeepSeek、GitHub 和 Cloudflare 使用 Statuspage JSON；Google 使用 Google Cloud 事件 JSON；xAI、AWS 和 Azure 使用官方 RSS。DeepSeek 从官方状态页对应的 `deepseek.statuspage.io` JSON 后端抓取数据，但图片链接始终指向 `https://status.deepseek.com/`。还可以在插件配置中添加其他兼容 Statuspage JSON 的状态页。
 
 ## 配置
 
@@ -52,7 +52,7 @@ OpenAI、Claude、Groq、Cohere、GitHub 和 Cloudflare 使用 Statuspage JSON�
 
 ## 图标
 
-OpenAI、Claude、Google Vertex AI / Gemini、Groq、Cohere、AWS、Azure、GitHub 和 Cloudflare 的厂商 SVG 标识来自 [LobeHub Icons](https://icons.lobehub.com/components/lobe-hub)（`@lobehub/icons-static-svg@1.94.0`，MIT License）。许可全文随插件保存在 `assets/icons/LOBEHUB_LICENSE.txt`，各品牌名称与商标归其权利人所有。
+OpenAI、Claude、Google Vertex AI / Gemini、Groq、Cohere、xAI、DeepSeek、AWS、Azure、GitHub 和 Cloudflare 的厂商 SVG 标识来自 [LobeHub Icons](https://icons.lobehub.com/components/lobe-hub)（`@lobehub/icons-static-svg@1.94.0`，MIT License）。许可全文随插件保存在 `assets/icons/LOBEHUB_LICENSE.txt`，各品牌名称与商标归其权利人所有。
 
 所有图标均内置在插件中，运行时不会联网下载。告警阶段、严重度、服务、时间和链接也使用本地 SVG；自定义 Statuspage 来源没有匹配的厂商标识时继续使用通用厂商 SVG，不会生成首字母头像。
 

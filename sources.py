@@ -170,6 +170,20 @@ BUILTIN_SOURCES: tuple[SourceSpec, ...] = (
         "https://status.cohere.com/",
     ),
     SourceSpec(
+        "xai",
+        "xAI",
+        "rss",
+        "https://status.x.ai/feed.xml",
+        "https://status.x.ai/",
+    ),
+    SourceSpec(
+        "deepseek",
+        "DeepSeek",
+        "statuspage",
+        "https://deepseek.statuspage.io",
+        "https://status.deepseek.com/",
+    ),
+    SourceSpec(
         "aws",
         "Amazon Web Services",
         "rss",
@@ -543,7 +557,7 @@ def parse_rss(
     except ElementTree.ParseError as exc:
         raise ValueError(f"Invalid RSS XML: {exc}") from exc
 
-    newest: dict[str, tuple[float, str, str, str, str]] = {}
+    newest: dict[str, tuple[float, str, str, str, str, tuple[str, ...]]] = {}
     for element in root.iter():
         if element.tag.rsplit("}", 1)[-1].lower() != "item":
             continue
@@ -552,8 +566,20 @@ def parse_rss(
         guid = _xml_child_text(element, "guid")
         link = _xml_child_text(element, "link")
         published = _xml_child_text(element, "pubDate")
+        categories = tuple(
+            "".join(child.itertext()).strip().lower()
+            for child in element
+            if child.tag.rsplit("}", 1)[-1].lower() == "category"
+        )
         issue_id = _rss_issue_id(guid, link, title)
-        candidate = (_rss_timestamp(published), title, description, published, link)
+        candidate = (
+            _rss_timestamp(published),
+            title,
+            description,
+            published,
+            link,
+            categories,
+        )
         if issue_id not in newest or candidate[0] >= newest[issue_id][0]:
             newest[issue_id] = candidate
 
@@ -566,9 +592,18 @@ def parse_rss(
         "resolved:",
     )
     maintenance_phrases = ("scheduled maintenance", "planned maintenance")
-    for issue_id, (_, title, description, published, link) in newest.items():
+    for issue_id, (
+        _,
+        title,
+        description,
+        published,
+        link,
+        categories,
+    ) in newest.items():
         combined = f"{title} {description}".lower()
-        if any(phrase in combined for phrase in resolved_phrases):
+        if "resolved" in categories or any(
+            phrase in combined for phrase in resolved_phrases
+        ):
             result.resolved_issue_ids.add(issue_id)
             continue
         if not notify_maintenance and any(
@@ -578,7 +613,11 @@ def parse_rss(
 
         title_lower = title.lower()
         severity = "warning"
-        if "disruption" in title_lower or "outage" in title_lower:
+        if (
+            {"unavailable", "outage", "critical"} & set(categories)
+            or "disruption" in title_lower
+            or "outage" in title_lower
+        ):
             severity = "critical"
         elif "maintenance" in title_lower:
             severity = "maintenance"

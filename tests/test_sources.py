@@ -176,3 +176,45 @@ def test_build_source_specs_validates_and_deduplicates_custom_sources():
     assert any(spec.source_id == "openai" for spec in specs)
     assert not any(spec.source_id == "claude" for spec in specs)
     assert len([spec for spec in specs if spec.source_id.startswith("custom_")]) == 1
+    by_id = {spec.source_id: spec for spec in specs}
+    assert by_id["xai"].endpoint == "https://status.x.ai/feed.xml"
+    assert by_id["xai"].kind == "rss"
+    assert by_id["deepseek"].endpoint == "https://deepseek.statuspage.io"
+    assert by_id["deepseek"].status_url == "https://status.deepseek.com/"
+
+
+def test_xai_rss_categories_control_resolution_and_severity():
+    spec = SourceSpec(
+        "xai",
+        "xAI",
+        "rss",
+        "https://status.x.ai/feed.xml",
+        "https://status.x.ai/",
+    )
+    active_xml = """
+    <rss><channel><item>
+      <title>xAI API availability incident</title>
+      <guid>incident-42</guid>
+      <pubDate>Mon, 20 Jul 2026 01:00:00 GMT</pubDate>
+      <description>Requests are failing.</description>
+      <category>outage</category>
+    </item></channel></rss>
+    """
+    active = parse_rss(spec, active_xml, False)
+    issue_id, issue = next(iter(active.issues.items()))
+
+    assert issue.severity == "critical"
+
+    resolved_xml = """
+    <rss><channel><item>
+      <title>xAI API availability incident</title>
+      <guid>incident-42</guid>
+      <pubDate>Mon, 20 Jul 2026 01:10:00 GMT</pubDate>
+      <description>Services are healthy.</description>
+      <category>resolved</category>
+    </item></channel></rss>
+    """
+    resolved = parse_rss(spec, resolved_xml, False)
+
+    assert not resolved.issues
+    assert issue_id in resolved.resolved_issue_ids

@@ -94,6 +94,16 @@
         "type": "bool",
         "default": true
       },
+      "xai": {
+        "description": "xAI",
+        "type": "bool",
+        "default": true
+      },
+      "deepseek": {
+        "description": "DeepSeek",
+        "type": "bool",
+        "default": true
+      },
       "aws": {
         "description": "Amazon Web Services",
         "type": "bool",

@@ -44,6 +44,8 @@ VENDOR_COLORS = {
     "google_vertex_gemini": "#7C8CF8",
     "groq": "#F55036",
     "cohere": "#2D8C78",
+    "xai": "#111111",
+    "deepseek": "#4D6BFE",
     "aws": "#E99024",
     "azure": "#1689D4",
     "github": "#64748B",
