@@ -1,0 +1,8 @@
+name: astrbot_plugin_global_status
+display_name: 全球厂商状态监控
+description: 订阅主流 AI、云与开发平台的官方状态页，并向 aiocqhttp 群聊推送图片告警。
+version: 1.0.0
+author: Futureppo
+support_platforms:
+  - aiocqhttp
+astrbot_version: ">=4.26.7,<5"
