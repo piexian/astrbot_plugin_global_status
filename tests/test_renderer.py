@@ -4,6 +4,7 @@ from PIL import Image
 
 from data.plugins.astrbot_plugin_global_status.renderer import (
     ICON_DIR,
+    PROJECT_SIGNATURE,
     _svg_icon,
     build_alert_fallback,
     render_alert_card,
@@ -35,6 +36,7 @@ def test_render_alert_card_returns_valid_dynamic_png():
     assert image.format == "PNG"
     assert image.width == 1200
     assert image.height > 500
+    assert PROJECT_SIGNATURE == "Futureppo/astrbot_plugin_global_status"
 
 
 def test_svg_icon_assets_rasterize_without_native_dependencies():
