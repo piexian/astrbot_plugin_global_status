@@ -172,12 +172,11 @@ class GlobalStatusMonitor(star.Star):
                 continue
 
     def _configured_groups(self) -> list[str]:
-        """Parse group_whitelist into normalized target entries.
+        """Normalize group_whitelist entries: trim, deduplicate, and return.
 
-        Accepts three formats per entry:
-        - Pure digits: QQ group number (aiocqhttp)
-        - Non-empty string without colons: group_openid (qq_official)
-        - Contains ':': full UMO (platform_id:MessageType:session_id)
+        Entries may be pure digit group IDs, group_openid strings, or full
+        UMO strings (platform_id:MessageType:session_id). Format-specific
+        validation is deferred to _targets().
         """
         raw_groups = self.config.get("group_whitelist", [])
         if not isinstance(raw_groups, list):
@@ -193,9 +192,19 @@ class GlobalStatusMonitor(star.Star):
     def _platform_type(self) -> str:
         """Return the configured platform adapter type name."""
         raw = str(self.config.get("platform_type", "aiocqhttp") or "").strip()
-        if raw in ("aiocqhttp", "qq_official"):
-            return raw
-        return "aiocqhttp"
+        if not raw:
+            return "aiocqhttp"
+        known = {"aiocqhttp", "qq_official"}
+        if raw not in known:
+            logger.warning(
+                "Unknown platform_type %r in configuration; known types: %s. "
+                "Falling back to 'aiocqhttp' for plain group ID resolution. "
+                "Use full UMO in group_whitelist to target other platforms.",
+                raw,
+                ", ".join(sorted(known)),
+            )
+            return "aiocqhttp"
+        return raw
 
     def _resolve_platform_id(self) -> str | None:
         configured_id = str(self.config.get("platform_id", "")).strip()
@@ -247,6 +256,7 @@ class GlobalStatusMonitor(star.Star):
             return {}
         targets: dict[str, str] = {}
         plain_groups: list[str] = []
+        active_ids: set[str] | None = None
         for entry in groups:
             if ":" in entry:
                 # Full UMO — validate format and platform existence.
@@ -259,14 +269,15 @@ class GlobalStatusMonitor(star.Star):
                         "Invalid UMO format in group_whitelist: %r, skipping.", entry
                     )
                     continue
-                manager = getattr(self.context, "platform_manager", None)
-                platforms = manager.get_insts() if manager is not None else []
-                active_ids: set[str] = set()
-                for p in platforms:
-                    try:
-                        active_ids.add(str(p.meta().id))
-                    except Exception:
-                        continue
+                if active_ids is None:
+                    manager = getattr(self.context, "platform_manager", None)
+                    platforms = manager.get_insts() if manager is not None else []
+                    active_ids = set()
+                    for p in platforms:
+                        try:
+                            active_ids.add(str(p.meta().id))
+                        except Exception:
+                            continue
                 if str(session.platform_id) not in active_ids:
                     logger.warning(
                         "UMO %r references unknown platform_id %r, skipping.",
