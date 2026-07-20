@@ -4,20 +4,34 @@
     "type": "bool",
     "default": true
   },
+  "platform_type": {
+    "description": "推送平台类型",
+    "type": "string",
+    "options": [
+      "aiocqhttp",
+      "qq_official"
+    ],
+    "labels": [
+      "OneBot (aiocqhttp)",
+      "QQ 官方机器人 (WebSocket)"
+    ],
+    "default": "aiocqhttp",
+    "hint": "选择用于主动推送告警的平台适配器类型。qq_official 使用 WebSocket 接口，群 ID 为 group_openid。"
+  },
   "platform_id": {
-    "description": "aiocqhttp 平台实例 ID",
+    "description": "平台实例 ID",
     "type": "string",
     "default": "",
-    "hint": "留空时会自动选择唯一的 aiocqhttp 实例；当前环境的实例 ID 为 1。"
+    "hint": "留空时自动选择对应类型下唯一的活跃实例。"
   },
   "group_whitelist": {
-    "description": "接收主动告警的 QQ 群号白名单",
+    "description": "接收主动告警的目标白名单",
     "type": "list",
     "default": [],
     "items": {
       "type": "string"
     },
-    "hint": "只接受纯数字群号；列表为空时不会主动发送任何消息。"
+    "hint": "支持三种格式：纯数字群号（aiocqhttp）、group_openid（qq_official）、完整 UMO（如 platform_id:GroupMessage:session_id，任意平台）。列表为空时不会主动发送任何消息。"
   },
   "poll_interval_seconds": {
     "description": "轮询间隔（秒）",
