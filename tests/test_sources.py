@@ -181,6 +181,10 @@ def test_build_source_specs_validates_and_deduplicates_custom_sources():
     assert by_id["xai"].kind == "rss"
     assert by_id["deepseek"].endpoint == "https://deepseek.statuspage.io"
     assert by_id["deepseek"].status_url == "https://status.deepseek.com/"
+    assert by_id["moonshot"].endpoint == "https://status.moonshot.cn"
+    assert by_id["moonshot"].kind == "statuspage"
+    assert by_id["minimax"].endpoint == "https://status.minimaxi.com"
+    assert by_id["minimax"].kind == "statuspage"
 
 
 def test_xai_rss_categories_control_resolution_and_severity():

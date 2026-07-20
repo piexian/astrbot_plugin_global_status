@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import aiohttp
 
@@ -104,6 +106,31 @@ class GlobalStatusMonitor(star.Star):
             source_config if isinstance(source_config, dict) else {},
             custom_sources if isinstance(custom_sources, list) else [],
         )
+
+    def _display_timezone_name(self) -> str:
+        """Return the plugin timezone override or AstrBot's global timezone."""
+        configured = str(self.config.get("timezone", "") or "").strip()
+        if configured:
+            return configured
+        try:
+            astrbot_config = self.context.get_config()
+        except (AttributeError, TypeError):
+            return ""
+        return str(astrbot_config.get("timezone", "") or "").strip()
+
+    def _display_datetime(self) -> datetime:
+        """Return the current time in the configured display timezone."""
+        timezone_name = self._display_timezone_name()
+        if not timezone_name:
+            return datetime.now().astimezone()
+        try:
+            return datetime.now(ZoneInfo(timezone_name))
+        except (ValueError, ZoneInfoNotFoundError):
+            logger.warning(
+                "Invalid status image timezone %r; using the system timezone.",
+                timezone_name,
+            )
+            return datetime.now().astimezone()
 
     async def _fetch_sources(self) -> list[SourceResult]:
         """Fetch all enabled sources under a lock shared with the query command."""
@@ -512,6 +539,7 @@ class GlobalStatusMonitor(star.Star):
                 results,
                 translations,
                 normalize_language(self.config.get("display_language", "bilingual")),
+                self._display_datetime(),
             )
             if self._translator.dirty:
                 await self.put_kv_data(

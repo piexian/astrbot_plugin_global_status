@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 import re
+from datetime import datetime
 from functools import lru_cache
 from io import BytesIO
 from pathlib import Path
@@ -44,6 +45,8 @@ VENDOR_COLORS = {
     "google_vertex_gemini": "#7C8CF8",
     "groq": "#F55036",
     "cohere": "#2D8C78",
+    "moonshot": "#111111",
+    "minimax": "#E2167E",
     "xai": "#111111",
     "deepseek": "#4D6BFE",
     "aws": "#E99024",
@@ -216,7 +219,7 @@ def _parse_color(value: str | None, current_color: str) -> str | None:
 
 
 _PATH_TOKEN_PATTERN = re.compile(
-    r"[AaCcHhLlMmVvZz]|[-+]?(?:\d*\.\d+|\d+\.?)(?:[eE][-+]?\d+)?"
+    r"[AaCcHhLlMmSsVvZz]|[-+]?(?:\d*\.\d+|\d+\.?)(?:[eE][-+]?\d+)?"
 )
 
 
@@ -342,6 +345,7 @@ def _svg_path_subpaths(data: str) -> list[list[tuple[float, float]]]:
     command = ""
     current = (0.0, 0.0)
     start = (0.0, 0.0)
+    last_cubic_control: tuple[float, float] | None = None
     subpath: list[tuple[float, float]] = []
     subpaths: list[list[tuple[float, float]]] = []
 
@@ -377,6 +381,7 @@ def _svg_path_subpaths(data: str) -> list[list[tuple[float, float]]]:
                 if subpath and subpath[-1] != start:
                     subpath.append(start)
                 current = start
+                last_cubic_control = None
                 command = ""
                 continue
         if not command:
@@ -396,6 +401,7 @@ def _svg_path_subpaths(data: str) -> list[list[tuple[float, float]]]:
             current = (x, y)
             start = current
             subpath = [current]
+            last_cubic_control = None
             command = "l" if relative else "L"
         elif operation == "L":
             x, y = number(), number()
@@ -404,14 +410,17 @@ def _svg_path_subpaths(data: str) -> list[list[tuple[float, float]]]:
                 y += current[1]
             current = (x, y)
             subpath.append(current)
+            last_cubic_control = None
         elif operation == "H":
             x = number() + (current[0] if relative else 0)
             current = (x, current[1])
             subpath.append(current)
+            last_cubic_control = None
         elif operation == "V":
             y = number() + (current[1] if relative else 0)
             current = (current[0], y)
             subpath.append(current)
+            last_cubic_control = None
         elif operation == "C":
             control_one = (number(), number())
             control_two = (number(), number())
@@ -443,6 +452,42 @@ def _svg_path_subpaths(data: str) -> list[list[tuple[float, float]]]:
                     )
                 )
             current = end
+            last_cubic_control = control_two
+        elif operation == "S":
+            control_two = (number(), number())
+            end = (number(), number())
+            if relative:
+                control_two = (
+                    control_two[0] + current[0],
+                    control_two[1] + current[1],
+                )
+                end = (end[0] + current[0], end[1] + current[1])
+            control_one = (
+                current
+                if last_cubic_control is None
+                else (
+                    2 * current[0] - last_cubic_control[0],
+                    2 * current[1] - last_cubic_control[1],
+                )
+            )
+            origin = current
+            for step in range(1, 13):
+                position = step / 12
+                inverse = 1 - position
+                subpath.append(
+                    (
+                        inverse**3 * origin[0]
+                        + 3 * inverse**2 * position * control_one[0]
+                        + 3 * inverse * position**2 * control_two[0]
+                        + position**3 * end[0],
+                        inverse**3 * origin[1]
+                        + 3 * inverse**2 * position * control_one[1]
+                        + 3 * inverse * position**2 * control_two[1]
+                        + position**3 * end[1],
+                    )
+                )
+            current = end
+            last_cubic_control = control_two
         elif operation == "A":
             radius_x, radius_y, rotation = number(), number(), number()
             large_arc, sweep = arc_flag(), arc_flag()
@@ -461,6 +506,7 @@ def _svg_path_subpaths(data: str) -> list[list[tuple[float, float]]]:
                 )
             )
             current = end
+            last_cubic_control = None
         else:
             raise ValueError(f"Unsupported SVG path command: {command}")
     if subpath:
@@ -681,6 +727,29 @@ def _draw_project_footer(image: Image.Image, y: int) -> None:
         font=font,
         fill="#858B91",
     )
+
+
+def _format_overview_date(value: datetime, language: str) -> str:
+    """Format the overview heading timestamp without using system locales."""
+    if language == "en-US":
+        months = (
+            "JANUARY",
+            "FEBRUARY",
+            "MARCH",
+            "APRIL",
+            "MAY",
+            "JUNE",
+            "JULY",
+            "AUGUST",
+            "SEPTEMBER",
+            "OCTOBER",
+            "NOVEMBER",
+            "DECEMBER",
+        )
+        return (
+            f"{months[value.month - 1]} {value.day:02d}, {value.year}  {value:%H:%M:%S}"
+        )
+    return f"{value.year}年{value.month:02d}月{value.day:02d}日  {value:%H:%M:%S}"
 
 
 def _localized_pair(
@@ -1004,6 +1073,7 @@ def render_overview(
     results: list[SourceResult],
     translations: dict[str, str] | None = None,
     language: str = "bilingual",
+    generated_at: datetime | None = None,
 ) -> bytes:
     """Render current status of all enabled sources into one bilingual PNG image.
 
@@ -1011,12 +1081,14 @@ def render_overview(
         results: Latest source query results.
         translations: Original official strings mapped to Chinese translations.
         language: ``zh-CN``, ``en-US``, or ``bilingual``.
+        generated_at: Timezone-aware time used for the timestamp heading.
 
     Returns:
         Encoded PNG bytes.
     """
     language = normalize_language(language)
     translations = translations or {}
+    generated_at = generated_at or datetime.now().astimezone()
     rows: list[dict[str, object]] = []
     for result in results:
         primary_lines: list[str] = []
@@ -1057,7 +1129,7 @@ def render_overview(
     draw = ImageDraw.Draw(image)
     draw.text(
         (52, 48),
-        "全球厂商服务状态" if language != "en-US" else "Global vendor status",
+        _format_overview_date(generated_at, language),
         font=_font(43, True),
         fill=TEXT,
     )

@@ -31,9 +31,10 @@ class DummyPlatformManager:
 
 
 class DummyContext:
-    def __init__(self, platforms=None, provider=None):
+    def __init__(self, platforms=None, provider=None, global_config=None):
         self.platform_manager = DummyPlatformManager(platforms)
         self.provider = provider
+        self.global_config = global_config or {"timezone": "Asia/Shanghai"}
         self.sent = []
 
     async def send_message(self, umo, chain):
@@ -42,6 +43,9 @@ class DummyContext:
 
     def get_using_provider(self):
         return self.provider
+
+    def get_config(self):
+        return self.global_config
 
 
 def _plugin(config=None, platforms=None):
@@ -86,6 +90,22 @@ def test_platform_auto_selection_rejects_multiple_instances():
 
     assert plugin._resolve_platform_id() is None
     assert plugin._targets(["100"]) == {}
+
+
+def test_image_timezone_override_and_astrbot_default():
+    plugin = GlobalStatusMonitor(
+        DummyContext(global_config={"timezone": "Europe/London"}),
+        {"timezone": ""},
+    )
+
+    assert plugin._display_timezone_name() == "Europe/London"
+    assert getattr(plugin._display_datetime().tzinfo, "key", "") == "Europe/London"
+
+    plugin.config["timezone"] = "America/New_York"
+    assert plugin._display_timezone_name() == "America/New_York"
+    assert getattr(plugin._display_datetime().tzinfo, "key", "") == (
+        "America/New_York"
+    )
 
 
 def test_reconcile_initial_update_dedup_and_recovery():

@@ -52,6 +52,12 @@
     "default": "bilingual",
     "hint": "双语模式优先显示中文译文，并在下方保留官方英文原文。"
   },
+  "timezone": {
+    "description": "状态图片时间时区",
+    "type": "string",
+    "default": "",
+    "hint": "控制总览图顶部精确到秒的时间。填写 IANA 时区名称，例如 Asia/Shanghai；留空时跟随 AstrBot 全局“时区”设置，两处都为空时使用系统本地时区。"
+  },
   "enable_ai_translation": {
     "description": "使用对话模型翻译官方英文内容",
     "type": "bool",
@@ -91,6 +97,16 @@
       },
       "cohere": {
         "description": "Cohere",
+        "type": "bool",
+        "default": true
+      },
+      "moonshot": {
+        "description": "Moonshot AI / Kimi",
+        "type": "bool",
+        "default": true
+      },
+      "minimax": {
+        "description": "MiniMax",
         "type": "bool",
         "default": true
       },

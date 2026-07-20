@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from io import BytesIO
 
 from PIL import Image
@@ -7,6 +8,7 @@ from data.plugins.astrbot_plugin_global_status.renderer import (
     PROJECT_SIGNATURE,
     _event_layout,
     _font,
+    _format_overview_date,
     _svg_icon,
     _text_width,
     _wrap_text,
@@ -50,6 +52,8 @@ def test_svg_icon_assets_rasterize_without_native_dependencies():
         "google_vertex_gemini",
         "groq",
         "cohere",
+        "moonshot",
+        "minimax",
         "xai",
         "deepseek",
         "aws",
@@ -168,9 +172,22 @@ def test_render_overview_includes_operational_and_unavailable_rows():
         SourceResult(spec=bad_spec, success=False, error="timeout"),
     ]
 
-    data = render_overview(results)
+    generated_at = datetime(2026, 7, 20, 13, 0, tzinfo=timezone.utc)
+    data = render_overview(results, generated_at=generated_at)
     image = Image.open(BytesIO(data))
 
     assert image.format == "PNG"
     assert image.size[0] == 1200
     assert image.size[1] >= 400
+    assert (
+        _format_overview_date(generated_at, "bilingual")
+        == "2026年07月20日  13:00:00"
+    )
+    assert (
+        _format_overview_date(generated_at, "zh-CN")
+        == "2026年07月20日  13:00:00"
+    )
+    assert (
+        _format_overview_date(generated_at, "en-US")
+        == "JULY 20, 2026  13:00:00"
+    )

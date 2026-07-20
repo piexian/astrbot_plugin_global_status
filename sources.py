@@ -170,6 +170,20 @@ BUILTIN_SOURCES: tuple[SourceSpec, ...] = (
         "https://status.cohere.com/",
     ),
     SourceSpec(
+        "moonshot",
+        "Moonshot AI / Kimi",
+        "statuspage",
+        "https://status.moonshot.cn",
+        "https://status.moonshot.cn/",
+    ),
+    SourceSpec(
+        "minimax",
+        "MiniMax",
+        "statuspage",
+        "https://status.minimaxi.com",
+        "https://status.minimaxi.com/",
+    ),
+    SourceSpec(
         "xai",
         "xAI",
         "rss",

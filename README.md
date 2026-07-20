@@ -4,12 +4,12 @@
 
 ## 内置来源
 
-- OpenAI、Claude / Anthropic、Groq、Cohere、xAI、DeepSeek
+- OpenAI、Claude / Anthropic、Groq、Cohere、Moonshot AI / Kimi、MiniMax、xAI、DeepSeek
 - Google Vertex AI / Gemini
 - Amazon Web Services、Microsoft Azure
 - GitHub、Cloudflare
 
-OpenAI、Claude、Groq、Cohere、DeepSeek、GitHub 和 Cloudflare 使用 Statuspage JSON；Google 使用 Google Cloud 事件 JSON；xAI、AWS 和 Azure 使用官方 RSS。DeepSeek 从官方状态页对应的 `deepseek.statuspage.io` JSON 后端抓取数据，但图片链接始终指向 `https://status.deepseek.com/`。还可以在插件配置中添加其他兼容 Statuspage JSON 的状态页。
+OpenAI、Claude、Groq、Cohere、Moonshot AI、MiniMax、DeepSeek、GitHub 和 Cloudflare 使用 Statuspage JSON；Google 使用 Google Cloud 事件 JSON；xAI、AWS 和 Azure 使用官方 RSS。DeepSeek 从官方状态页对应的 `deepseek.statuspage.io` JSON 后端抓取数据，但图片链接始终指向 `https://status.deepseek.com/`。还可以在插件配置中添加其他兼容 Statuspage JSON 的状态页。
 
 ## 配置
 
@@ -22,8 +22,9 @@ OpenAI、Claude、Groq、Cohere、DeepSeek、GitHub 和 Cloudflare 使用 Status
 5. `notify_maintenance`：默认关闭，计划维护不会被当作服务故障。
 6. `notify_existing_on_first_startup`：控制首次成功查询时是否推送厂商已有异常，默认开启。关闭时只建立状态基线，之后的更新和恢复仍会通知。
 7. `display_language`：支持 `中英双语`、`简体中文` 和 `English`，默认中英双语。
-8. `enable_ai_translation`：默认开启，调用 AstrBot 默认对话模型把官方英文事件翻译为简体中文。
-9. `translation_provider_id`：通常留空；留空时使用默认对话模型，也可以为翻译单独选择模型。
+8. `timezone`：控制总览图顶部精确到秒的日期时间所使用的时区。默认留空并跟随 AstrBot 全局“时区”设置；也可填写 `Asia/Shanghai` 等 IANA 时区名称单独覆盖。
+9. `enable_ai_translation`：默认开启，调用 AstrBot 默认对话模型把官方英文事件翻译为简体中文。
+10. `translation_provider_id`：通常留空；留空时使用默认对话模型，也可以为翻译单独选择模型。
 
 插件使用 AstrBot 的全局 `http_proxy` 环境配置访问状态页，无需重复配置代理。
 
@@ -52,7 +53,7 @@ OpenAI、Claude、Groq、Cohere、DeepSeek、GitHub 和 Cloudflare 使用 Status
 
 ## 图标
 
-OpenAI、Claude、Google Vertex AI / Gemini、Groq、Cohere、xAI、DeepSeek、AWS、Azure、GitHub 和 Cloudflare 的厂商 SVG 标识来自 [LobeHub Icons](https://icons.lobehub.com/components/lobe-hub)（`@lobehub/icons-static-svg@1.94.0`，MIT License）。许可全文随插件保存在 `assets/icons/LOBEHUB_LICENSE.txt`，各品牌名称与商标归其权利人所有。
+OpenAI、Claude、Google Vertex AI / Gemini、Groq、Cohere、Moonshot AI、MiniMax、xAI、DeepSeek、AWS、Azure、GitHub 和 Cloudflare 的厂商 SVG 标识来自 [LobeHub Icons](https://icons.lobehub.com/components/lobe-hub)（`@lobehub/icons-static-svg@1.94.0`，MIT License）。许可全文随插件保存在 `assets/icons/LOBEHUB_LICENSE.txt`，各品牌名称与商标归其权利人所有。
 
 所有图标均内置在插件中，运行时不会联网下载。告警阶段、严重度、服务、时间和链接也使用本地 SVG；自定义 Statuspage 来源没有匹配的厂商标识时继续使用通用厂商 SVG，不会生成首字母头像。
 
