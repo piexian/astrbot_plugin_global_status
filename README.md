@@ -2,6 +2,22 @@
 
 面向 `aiocqhttp` / OneBot v11 的主动状态告警插件。插件轮询官方状态接口，在服务出现异常、异常信息更新或恢复时生成精美的 PNG 状态卡并推送到指定 QQ 群。卡片图标全部来自插件内置 SVG 资产，运行时在内存中栅格化，不需要 Cairo 等原生依赖。
 
+## 图片示例
+
+以下图片使用演示数据生成，仅用于展示排版和主题效果，不代表厂商真实服务状态。
+
+### 四种主题对比
+
+[![纸质公报、午夜蓝图、青瓷云笺和荧光终端主题对比](assets/screenshots/themes-comparison.png)](assets/screenshots/themes-comparison.png)
+
+### 双语异常告警卡
+
+[![纸质公报双语异常告警卡](assets/screenshots/alert-paper-bilingual.png)](assets/screenshots/alert-paper-bilingual.png)
+
+### 全部厂商状态总览
+
+[![纸质公报双语厂商状态总览](assets/screenshots/overview-paper-bilingual.png)](assets/screenshots/overview-paper-bilingual.png)
+
 ## 内置来源
 
 - OpenAI、Claude / Anthropic、Groq、Cohere、Moonshot AI / Kimi、MiniMax、xAI、DeepSeek

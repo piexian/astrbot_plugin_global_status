@@ -939,9 +939,14 @@ def _format_event_time(value: str, display_timezone: tzinfo | None) -> str:
         return original
     target_timezone = display_timezone or datetime.now().astimezone().tzinfo
     localized = parsed.astimezone(target_timezone)
-    offset = localized.strftime("%z")
+    return _format_local_datetime(localized)
+
+
+def _format_local_datetime(value: datetime) -> str:
+    """Format an aware local datetime with a readable UTC offset."""
+    offset = value.strftime("%z")
     offset_label = f"UTC{offset[:3]}:{offset[3:]}" if offset else ""
-    return f"{localized:%Y-%m-%d %H:%M:%S} {offset_label}".rstrip()
+    return f"{value:%Y-%m-%d %H:%M:%S} {offset_label}".rstrip()
 
 
 def _localized_pair(
@@ -989,8 +994,8 @@ def _event_layout(
     language: str,
 ) -> dict[str, object]:
     title, title_original = _localized_pair(issue.title, translations, language)
-    title_lines = _wrap_text(title, _font(36, True), 950, 3)
-    title_original_lines = _wrap_text(title_original, _font(20), 950, 2)
+    title_lines = _wrap_text(title, _font(36, True), 888, 3)
+    title_original_lines = _wrap_text(title_original, _font(20), 888, 2)
 
     services = list(issue.affected_services[:12])
     localized_services = [
@@ -1049,6 +1054,7 @@ def render_alert_card(
     language: str = "bilingual",
     display_timezone: tzinfo | None = None,
     card_theme: str = DEFAULT_CARD_THEME,
+    generated_at: datetime | None = None,
 ) -> bytes:
     """Render one vendor's changed issues into a polished bilingual PNG card.
 
@@ -1059,6 +1065,7 @@ def render_alert_card(
         language: ``zh-CN``, ``en-US``, or ``bilingual``.
         display_timezone: Timezone used for official event timestamps.
         card_theme: Configured visual theme identifier.
+        generated_at: Timezone-aware card generation time.
 
     Returns:
         Encoded PNG bytes.
@@ -1071,6 +1078,18 @@ def render_alert_card(
     language = normalize_language(language)
     translations = translations or {}
     theme = CARD_THEMES[normalize_card_theme(card_theme)]
+    if generated_at is None:
+        generated_at = (
+            datetime.now(display_timezone)
+            if display_timezone is not None
+            else datetime.now().astimezone()
+        )
+    elif generated_at.tzinfo is None:
+        generated_at = generated_at.replace(
+            tzinfo=display_timezone or datetime.now().astimezone().tzinfo
+        )
+    elif display_timezone is not None:
+        generated_at = generated_at.astimezone(display_timezone)
     layouts = [
         _event_layout(stage, issue, translations, language) for stage, issue in events
     ]
@@ -1097,12 +1116,13 @@ def render_alert_card(
         theme.text,
         48,
     )
-    header_subtitle = {
-        "zh-CN": "厂商官方状态更新",
-        "en-US": "Official vendor status update",
-        "bilingual": "厂商官方状态更新  /  Official vendor update",
-    }[language]
-    draw.text((152, 91), header_subtitle, font=_font(20), fill=theme.muted)
+    _paste_icon(image, "clock", (152, 95), 17, theme.muted)
+    draw.text(
+        (179, 91),
+        _format_local_datetime(generated_at),
+        font=_font(20),
+        fill=theme.muted,
+    )
 
     source_url = events[0][1].status_url
     source_host = urlparse(source_url).netloc or "official status page"
@@ -1162,10 +1182,26 @@ def render_alert_card(
         )
 
         cursor = y + 82
+        event_vendor_color = VENDOR_COLORS.get(issue.source_id, "#386A8A")
+        draw.rounded_rectangle(
+            (82, cursor + 1, 126, cursor + 45),
+            radius=min(theme.badge_radius, 11),
+            fill=theme.icon_surface,
+            outline=theme.border,
+            width=1,
+        )
+        _paste_icon(
+            image,
+            _vendor_icon(issue.source_id),
+            (90, cursor + 9),
+            28,
+            event_vendor_color,
+        )
+        draw = ImageDraw.Draw(image)
         cursor = _draw_lines(
             draw,
             layout["title_lines"],
-            (82, cursor),
+            (144, cursor),
             _font(36, True),
             theme.text,
             47,
@@ -1173,7 +1209,7 @@ def render_alert_card(
         original_lines = layout["title_original_lines"]
         if original_lines:
             cursor = _draw_lines(
-                draw, original_lines, (82, cursor), _font(20), theme.muted, 27
+                draw, original_lines, (144, cursor), _font(20), theme.muted, 27
             )
 
         service_lines = layout["service_lines"]

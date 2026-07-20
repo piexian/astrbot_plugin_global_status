@@ -374,15 +374,16 @@ class GlobalStatusMonitor(star.Star):
                 str(self.config.get("translation_provider_id", "")).strip(),
             )
         try:
-            display_timezone = self._display_datetime().tzinfo
+            generated_at = self._display_datetime()
             png = await asyncio.to_thread(
                 render_alert_card,
                 source_name,
                 events,
                 translations,
                 language,
-                display_timezone,
+                generated_at.tzinfo,
                 str(self.config.get("card_theme", "paper")),
+                generated_at,
             )
             chain = MessageChain([Image.fromBytes(png)])
         except Exception:
