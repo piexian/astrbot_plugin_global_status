@@ -172,35 +172,58 @@ class GlobalStatusMonitor(star.Star):
                 continue
 
     def _configured_groups(self) -> list[str]:
+        """Normalize group_whitelist entries: trim, deduplicate, and return.
+
+        Entries may be pure digit group IDs, group_openid strings, or full
+        UMO strings (platform_id:MessageType:session_id). Format-specific
+        validation is deferred to _targets().
+        """
         raw_groups = self.config.get("group_whitelist", [])
         if not isinstance(raw_groups, list):
             return []
-        groups: list[str] = []
+        entries: list[str] = []
         for raw_group in raw_groups:
-            group_id = str(raw_group).strip()
-            if group_id.isdigit() and group_id not in groups:
-                groups.append(group_id)
-            elif group_id:
-                logger.warning("Ignoring invalid non-numeric QQ group ID: %s", group_id)
-        return groups
+            entry = str(raw_group).strip()
+            if not entry or entry in entries:
+                continue
+            entries.append(entry)
+        return entries
+
+    def _platform_type(self) -> str:
+        """Return the configured platform adapter type name."""
+        raw = str(self.config.get("platform_type", "aiocqhttp") or "").strip()
+        if not raw:
+            return "aiocqhttp"
+        known = {"aiocqhttp", "qq_official"}
+        if raw not in known:
+            logger.warning(
+                "Unknown platform_type %r in configuration; known types: %s. "
+                "Falling back to 'aiocqhttp' for plain group ID resolution. "
+                "Use full UMO in group_whitelist to target other platforms.",
+                raw,
+                ", ".join(sorted(known)),
+            )
+            return "aiocqhttp"
+        return raw
 
     def _resolve_platform_id(self) -> str | None:
         configured_id = str(self.config.get("platform_id", "")).strip()
+        adapter_type = self._platform_type()
         manager = getattr(self.context, "platform_manager", None)
         platforms = manager.get_insts() if manager is not None else []
-        aiocqhttp_platforms = []
+        matched_platforms = []
         for platform in platforms:
             try:
                 metadata = platform.meta()
             except Exception:
                 continue
-            if metadata.name == "aiocqhttp":
-                aiocqhttp_platforms.append(metadata)
+            if metadata.name == adapter_type:
+                matched_platforms.append(metadata)
 
         resolved: str | None = None
         if configured_id:
             match = next(
-                (item for item in aiocqhttp_platforms if str(item.id) == configured_id),
+                (item for item in matched_platforms if str(item.id) == configured_id),
                 None,
             )
             if match is not None:
@@ -208,18 +231,18 @@ class GlobalStatusMonitor(star.Star):
             else:
                 warning = (
                     f"Configured platform_id {configured_id!r} is not an active "
-                    "aiocqhttp instance."
+                    f"{adapter_type} instance."
                 )
                 if warning != self._platform_warning:
                     logger.warning(warning)
                     self._platform_warning = warning
                 return None
-        elif len(aiocqhttp_platforms) == 1:
-            resolved = str(aiocqhttp_platforms[0].id)
+        elif len(matched_platforms) == 1:
+            resolved = str(matched_platforms[0].id)
         else:
             warning = (
-                "Cannot auto-select aiocqhttp platform: expected exactly one active "
-                f"instance, found {len(aiocqhttp_platforms)}."
+                f"Cannot auto-select {adapter_type} platform: expected exactly one "
+                f"active instance, found {len(matched_platforms)}."
             )
             if warning != self._platform_warning:
                 logger.warning(warning)
@@ -231,13 +254,51 @@ class GlobalStatusMonitor(star.Star):
     def _targets(self, groups: list[str]) -> dict[str, str]:
         if not groups:
             return {}
-        platform_id = self._resolve_platform_id()
-        if not platform_id:
-            return {}
-        return {
-            f"{platform_id}|{group_id}": f"{platform_id}:GroupMessage:{group_id}"
-            for group_id in groups
-        }
+        targets: dict[str, str] = {}
+        plain_groups: list[str] = []
+        active_ids: set[str] | None = None
+        for entry in groups:
+            if ":" in entry:
+                # Full UMO — validate format and platform existence.
+                try:
+                    from astrbot.core.platform.message_session import MessageSesion
+
+                    session = MessageSesion.from_str(entry)
+                except Exception:
+                    logger.warning(
+                        "Invalid UMO format in group_whitelist: %r, skipping.", entry
+                    )
+                    continue
+                if active_ids is None:
+                    manager = getattr(self.context, "platform_manager", None)
+                    platforms = manager.get_insts() if manager is not None else []
+                    active_ids = set()
+                    for p in platforms:
+                        try:
+                            active_ids.add(str(p.meta().id))
+                        except Exception:
+                            continue
+                if str(session.platform_id) not in active_ids:
+                    logger.warning(
+                        "UMO %r references unknown platform_id %r, skipping.",
+                        entry,
+                        session.platform_id,
+                    )
+                    continue
+                targets[entry] = entry
+            else:
+                plain_groups.append(entry)
+        if plain_groups:
+            platform_id = self._resolve_platform_id()
+            if platform_id:
+                seen_umos = set(targets.values())
+                for group_id in plain_groups:
+                    umo = f"{platform_id}:GroupMessage:{group_id}"
+                    if umo in seen_umos:
+                        continue
+                    seen_umos.add(umo)
+                    targets[f"{platform_id}|{group_id}"] = umo
+        return targets
 
     def _prune_disabled_sources(self, enabled_source_ids: set[str]) -> None:
         sources_state = self._state["sources"]
@@ -520,7 +581,9 @@ class GlobalStatusMonitor(star.Star):
             self._translator.dirty = False
 
     @filter.command("厂商状态", alias={"vendor_status"})
-    @filter.platform_adapter_type(filter.PlatformAdapterType.AIOCQHTTP)
+    @filter.platform_adapter_type(
+        filter.PlatformAdapterType.AIOCQHTTP | filter.PlatformAdapterType.QQOFFICIAL
+    )
     async def vendor_status(self, event: AstrMessageEvent):
         """Query all enabled vendor sources and return a current status image."""
         try:
