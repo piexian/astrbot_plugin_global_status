@@ -13,7 +13,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 from xml.etree import ElementTree
 
-from PIL import Image, ImageChops, ImageColor, ImageDraw, ImageFont
+from PIL import Image, ImageChops, ImageColor, ImageDraw, ImageEnhance, ImageFilter, ImageFont
 
 from astrbot.core.utils.astrbot_path import get_astrbot_data_path
 
@@ -177,21 +177,21 @@ CARD_THEMES: dict[str, CardTheme] = {
     "liquid_glass": CardTheme(
         background_top="#E9E9E7",
         background_bottom="#DCDDDC",
-        surface="#FFFFFFA6",
-        surface_alt="#F4F4F28C",
+        surface="#FFFFFF64",
+        surface_alt="#F4F4F250",
         icon_surface="#FAFAF8",
         text="#18191B",
-        text_soft="#3F4246",
-        muted="#70747A",
+        text_soft="#2E3135",
+        muted="#565A60",
         border="#C8CBCD",
         panel_highlight="#FFFFFF",
         chrome="#242629",
         divider="#C9CCCE",
         link="#0068D9",
         footer="#777B80",
-        critical_surface="#FFE8EBA6",
-        warning_surface="#FFF3DDA6",
-        unavailable_surface="#E9EBECA6",
+        critical_surface="#FFE8EB82",
+        warning_surface="#FFF3DD82",
+        unavailable_surface="#E9EBEC5A",
         severity_colors={
             "critical": "#C82035",
             "warning": "#9B6100",
@@ -876,9 +876,36 @@ def _new_canvas(height: int, theme: CardTheme) -> Image.Image:
                 for start, end in zip(top, bottom, strict=True)
             )
             draw.line((0, y, WIDTH, y), fill=color)
+    if theme.liquid_glass:
+        _paint_glass_backdrop(image, height)
     draw.rectangle((0, 0, WIDTH, 8), fill=theme.chrome)
     draw.line((52, 24, WIDTH - 52, 24), fill=theme.border, width=1)
     return image
+
+
+def _paint_glass_backdrop(image: Image.Image, height: int) -> None:
+    """Paint soft ambient light pools so the frosted glass has tone to refract.
+
+    Kept low-saturation and gentle: the goal is a calm tonal gradient the glass
+    blur can reveal as a distinct material, not colorful decoration.
+    """
+    layer = Image.new("RGBA", image.size, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(layer)
+    # 柔和彩色光场：中等饱和的粉彩色，重模糊后成平滑渐变，供玻璃折射
+    blobs = [
+        (120, int(height * 0.08), 360, (140, 180, 235, 120)),  # 淡蓝（左上）
+        (1080, int(height * 0.15), 340, (200, 165, 225, 110)), # 淡紫（右上）
+        (600, int(height * 0.48), 400, (165, 205, 200, 95)),   # 淡薄荷（中）
+        (180, int(height * 0.88), 360, (235, 180, 175, 110)),  # 淡桃（左下）
+        (1020, int(height * 0.82), 340, (180, 200, 235, 100)), # 淡蓝紫（右下）
+        (620, int(height * 0.92), 300, (225, 200, 165, 90)),   # 淡金（底中）
+    ]
+    for cx, cy, radius, color in blobs:
+        draw.ellipse(
+            (cx - radius, cy - radius, cx + radius, cy + radius), fill=color
+        )
+    layer = layer.filter(ImageFilter.GaussianBlur(65))
+    image.alpha_composite(layer)
 
 
 def _fill_rectangle(
@@ -913,15 +940,11 @@ def _draw_panel(
     panel_radius = theme.panel_radius if radius is None else radius
     panel_fill = fill or theme.surface
     fill_color = ImageColor.getcolor(panel_fill, "RGBA")
-    if fill_color[3] < 255:
+    if theme.liquid_glass:
+        _draw_glass_panel(image, bounds, panel_radius, fill_color, theme)
+    elif fill_color[3] < 255:
         overlay = Image.new("RGBA", image.size, (0, 0, 0, 0))
         overlay_draw = ImageDraw.Draw(overlay)
-        if theme.liquid_glass:
-            overlay_draw.rounded_rectangle(
-                (x1 + 3, y1 + 8, x2 + 3, y2 + 8),
-                radius=panel_radius,
-                fill=(16, 18, 20, 28),
-            )
         overlay_draw.rounded_rectangle(
             bounds,
             radius=panel_radius,
@@ -944,6 +967,89 @@ def _draw_panel(
         fill=theme.panel_highlight,
         width=1,
     )
+
+
+def _draw_glass_panel(
+    image: Image.Image,
+    bounds: tuple[int, int, int, int],
+    panel_radius: int,
+    fill_color: tuple[int, int, int, int],
+    theme: CardTheme,
+) -> None:
+    """Render a frosted-glass panel that reads as a physical sheet of glass.
+
+    The glass effect comes from four material cues, not decoration:
+    a softly blurred + saturated backdrop seen through a translucent tint,
+    a bright specular highlight where overhead light reflects off the surface,
+    rim lighting on the glass edge, and a grounding shadow.
+    """
+    x1, y1, x2, y2 = bounds
+    pw, ph = x2 - x1, y2 - y1
+    if pw <= 0 or ph <= 0:
+        return
+
+    mask = Image.new("L", (pw, ph), 0)
+    ImageDraw.Draw(mask).rounded_rectangle(
+        (0, 0, pw - 1, ph - 1), radius=panel_radius, fill=255
+    )
+
+    # 1. 投影：玻璃浮在背景之上，下方柔和阴影落地
+    shadow = Image.new("RGBA", image.size, (0, 0, 0, 0))
+    ImageDraw.Draw(shadow).rounded_rectangle(
+        (x1 + 2, y1 + 10, x2 + 2, y2 + 10),
+        radius=panel_radius,
+        fill=(30, 34, 40, 60),
+    )
+    shadow = shadow.filter(ImageFilter.GaussianBlur(14))
+    image.alpha_composite(shadow)
+
+    # 2. 透过玻璃看到的背景：裁剪 → 模糊 → 轻微提饱和（磨砂折射）
+    bg_blurred = image.crop(bounds).copy().filter(ImageFilter.GaussianBlur(16))
+    bg_blurred = ImageEnhance.Color(bg_blurred).enhance(1.15)
+    # 3. 半透明玻璃本色：压低白色占比，让柔化的背景色透出（玻璃感关键）
+    tint_alpha = min(fill_color[3], 112)
+    tint = Image.new("RGBA", (pw, ph), (*fill_color[:3], tint_alpha))
+    glass = Image.alpha_composite(bg_blurred, tint)
+    image.paste(glass, (x1, y1), mask)
+
+    # 4. 镜面高光：顶部一条明亮的反射光带，玻璃质感的核心
+    spec = Image.new("RGBA", (pw, ph), (0, 0, 0, 0))
+    spec_draw = ImageDraw.Draw(spec)
+    highlight_h = min(max(ph // 3, 40), 110)
+    for row in range(highlight_h):
+        t = row / highlight_h
+        alpha = int(85 * (1.0 - t) ** 1.8)
+        spec_draw.line((0, row, pw, row), fill=(255, 255, 255, alpha))
+    spec.putalpha(ImageChops.darker(spec.getchannel("A"), mask))
+    image.alpha_composite(spec, (x1, y1))
+
+    # 5. 边缘光：上/左亮边迎光，下/右暗边背光，勾勒玻璃厚度
+    edge = Image.new("RGBA", (pw, ph), (0, 0, 0, 0))
+    edge_draw = ImageDraw.Draw(edge)
+    edge_draw.rounded_rectangle(
+        (1, 1, pw - 2, ph - 2),
+        radius=max(panel_radius - 1, 1),
+        outline=(255, 255, 255, 150),
+        width=1,
+    )
+    edge_draw.rounded_rectangle(
+        (2, 2, pw - 3, ph - 3),
+        radius=max(panel_radius - 2, 1),
+        outline=(40, 44, 50, 30),
+        width=1,
+    )
+    edge.putalpha(ImageChops.darker(edge.getchannel("A"), mask))
+    image.alpha_composite(edge, (x1, y1))
+
+    # 6. 外描边
+    border_overlay = Image.new("RGBA", image.size, (0, 0, 0, 0))
+    ImageDraw.Draw(border_overlay).rounded_rectangle(
+        bounds,
+        radius=panel_radius,
+        outline=ImageColor.getcolor(theme.border, "RGBA"),
+        width=1,
+    )
+    image.alpha_composite(border_overlay)
 
 
 def _draw_project_footer(image: Image.Image, y: int, theme: CardTheme) -> None:
