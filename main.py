@@ -76,16 +76,56 @@ class GlobalStatusMonitor(star.Star):
             trust_env=True,
             headers={"User-Agent": "AstrBot-Global-Status-Monitor/1.0"},
         )
-        if bool(self.config.get("enabled", True)):
-            self._monitor_task = asyncio.create_task(
-                self._monitor_loop(),
-                name="astrbot-global-status-monitor",
-            )
-            logger.info("Global status monitor started.")
-        else:
+        self._maybe_start_monitor()
+
+    def _maybe_start_monitor(self) -> None:
+        """按当前状态决定是否立即启动轮询任务。
+
+        冷启动时平台适配器尚未实例化（platform_manager.initialize 在本插件
+        initialize 之后执行），此时推迟到 on_astrbot_loaded 钩子再启动；
+        运行时热重载时平台已就绪，直接启动。
+        """
+        if not bool(self.config.get("enabled", True)):
             logger.info(
                 "Global status monitor is disabled; query command remains available."
             )
+            return
+        if not self._platforms_ready():
+            logger.info(
+                "Global status monitor will start after AstrBot finishes loading."
+            )
+            return
+        self._start_monitor()
+
+    def _start_monitor(self) -> None:
+        """启动轮询任务（幂等，重复调用不会创建多个任务）。"""
+        if self._monitor_task is not None and not self._monitor_task.done():
+            return
+        self._stop_event.clear()
+        self._monitor_task = asyncio.create_task(
+            self._monitor_loop(),
+            name="astrbot-global-status-monitor",
+        )
+        logger.info("Global status monitor started.")
+
+    def _platforms_ready(self) -> bool:
+        """平台适配器是否已实例化。
+
+        冷启动期间 platform_manager 尚未填充实例，返回 False；AstrBot 完成
+        启动后（含运行时热重载）至少存在 webchat 适配器，恒返回 True。
+        """
+        manager = getattr(self.context, "platform_manager", None)
+        if manager is None:
+            return False
+        try:
+            return len(manager.get_insts()) > 0
+        except Exception:
+            return False
+
+    @filter.on_astrbot_loaded()
+    async def _on_astrbot_loaded(self) -> None:
+        """AstrBot 启动完成、平台适配器就绪后再启动轮询。"""
+        self._maybe_start_monitor()
 
     async def terminate(self) -> None:
         """Stop polling and close the shared HTTP client."""
