@@ -192,7 +192,8 @@ def test_build_source_specs_validates_and_deduplicates_custom_sources():
     by_id = {spec.source_id: spec for spec in specs}
     assert by_id["xai"].endpoint == "https://status.x.ai/feed.xml"
     assert by_id["xai"].kind == "rss"
-    assert by_id["deepseek"].endpoint == "https://deepseek.statuspage.io"
+    assert by_id["deepseek"].endpoint == "https://deepseek.statuspage.io/history.atom"
+    assert by_id["deepseek"].kind == "rss"
     assert by_id["deepseek"].status_url == "https://status.deepseek.com/"
     assert by_id["moonshot"].endpoint == "https://status.moonshot.cn"
     assert by_id["moonshot"].kind == "statuspage"
@@ -235,3 +236,116 @@ def test_xai_rss_categories_control_resolution_and_severity():
 
     assert not resolved.issues
     assert issue_id in resolved.resolved_issue_ids
+
+
+def test_parse_deepseek_atom_preserves_incident_id_and_latest_update():
+    spec = SourceSpec(
+        "deepseek",
+        "DeepSeek",
+        "rss",
+        "https://deepseek.statuspage.io/history.atom",
+        "https://status.deepseek.com/",
+    )
+    atom_xml = """
+    <feed xmlns="http://www.w3.org/2005/Atom">
+      <entry>
+        <id>tag:deepseek.statuspage.io,2005:Incident/30021499</id>
+        <title>DeepSeek Web/API Service Not Available</title>
+        <published>2026-08-04T09:00:00+08:00</published>
+        <updated>2026-08-04T10:00:00+08:00</updated>
+        <link rel="alternate" type="text/html"
+          href="https://deepseek.statuspage.io/incidents/vr5w0jpqv068" />
+        <content type="html">Investigating - Requests are failing.</content>
+      </entry>
+      <entry>
+        <id>tag:deepseek.statuspage.io,2005:Incident/30021499</id>
+        <title>DeepSeek Web/API Service Not Available</title>
+        <updated>2026-08-04T09:30:00+08:00</updated>
+        <link rel="alternate" type="text/html"
+          href="https://deepseek.statuspage.io/incidents/vr5w0jpqv068" />
+        <summary>Investigating - Older update.</summary>
+      </entry>
+    </feed>
+    """
+
+    result = parse_rss(spec, atom_xml, False)
+    legacy = parse_statuspage(
+        spec,
+        {"components": []},
+        {
+            "incidents": [
+                {
+                    "id": "vr5w0jpqv068",
+                    "name": "DeepSeek Web/API Service Not Available",
+                    "status": "investigating",
+                    "impact": "critical",
+                    "incident_updates": [],
+                    "components": [],
+                }
+            ]
+        },
+        False,
+    )
+
+    assert set(result.issues) == {"incident_vr5w0jpqv068"}
+    assert set(result.issues) == set(legacy.issues)
+    issue = result.issues["incident_vr5w0jpqv068"]
+    assert issue.detail == "Investigating - Requests are failing."
+    assert issue.updated_at == "2026-08-04T10:00:00+08:00"
+    assert issue.severity == "critical"
+    assert issue.status_url == "https://status.deepseek.com/"
+
+
+def test_parse_deepseek_atom_recognizes_resolution():
+    spec = SourceSpec(
+        "deepseek",
+        "DeepSeek",
+        "rss",
+        "https://deepseek.statuspage.io/history.atom",
+        "https://status.deepseek.com/",
+    )
+    atom_xml = """
+    <feed xmlns="http://www.w3.org/2005/Atom">
+      <entry>
+        <id>tag:deepseek.statuspage.io,2005:Incident/30021499</id>
+        <title>【已恢复】DeepSeek 网页/API不可用</title>
+        <updated>2026-08-04T11:00:00+08:00</updated>
+        <link rel="alternate" type="text/html"
+          href="https://deepseek.statuspage.io/incidents/vr5w0jpqv068" />
+        <content type="html">Resolved - This incident has been resolved.</content>
+      </entry>
+    </feed>
+    """
+
+    result = parse_rss(spec, atom_xml, False)
+
+    assert not result.issues
+    assert result.resolved_issue_ids == {"incident_vr5w0jpqv068"}
+
+
+def test_parse_atom_respects_maintenance_setting():
+    spec = SourceSpec(
+        "deepseek",
+        "DeepSeek",
+        "rss",
+        "https://deepseek.statuspage.io/history.atom",
+        "https://status.deepseek.com/",
+    )
+    atom_xml = """
+    <feed xmlns="http://www.w3.org/2005/Atom">
+      <entry>
+        <id>tag:deepseek.statuspage.io,2005:Incident/30021500</id>
+        <title>Scheduled maintenance for DeepSeek API</title>
+        <updated>2026-08-04T12:00:00+08:00</updated>
+        <link rel="alternate" type="text/html"
+          href="https://deepseek.statuspage.io/incidents/maintenance123" />
+        <content type="html">Planned maintenance is in progress.</content>
+      </entry>
+    </feed>
+    """
+
+    hidden = parse_rss(spec, atom_xml, False)
+    visible = parse_rss(spec, atom_xml, True)
+
+    assert not hidden.issues
+    assert visible.issues["incident_maintenance123"].severity == "maintenance"

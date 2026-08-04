@@ -193,8 +193,8 @@ BUILTIN_SOURCES: tuple[SourceSpec, ...] = (
     SourceSpec(
         "deepseek",
         "DeepSeek",
-        "statuspage",
-        "https://deepseek.statuspage.io",
+        "rss",
+        "https://deepseek.statuspage.io/history.atom",
         "https://status.deepseek.com/",
     ),
     SourceSpec(
@@ -530,8 +530,23 @@ def _xml_child_text(element: ElementTree.Element, name: str) -> str:
 
 
 def _rss_timestamp(value: str) -> float:
+    """Parse an RFC 2822 or ISO 8601 feed timestamp.
+
+    Args:
+        value: Timestamp text from an RSS or Atom element.
+
+    Returns:
+        Unix timestamp, or zero when the value cannot be parsed.
+    """
     try:
         parsed = parsedate_to_datetime(value)
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=UTC)
+        return parsed.timestamp()
+    except (TypeError, ValueError, OverflowError):
+        pass
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
         if parsed.tzinfo is None:
             parsed = parsed.replace(tzinfo=UTC)
         return parsed.timestamp()
@@ -553,39 +568,69 @@ def parse_rss(
     xml_text: str,
     notify_maintenance: bool,
 ) -> SourceResult:
-    """Parse and merge current official RSS status entries.
+    """Parse and merge current official RSS or Atom status entries.
 
     Args:
         spec: Source metadata.
-        xml_text: Raw RSS XML document.
+        xml_text: Raw RSS or Atom XML document.
         notify_maintenance: Whether planned maintenance entries should be included.
 
     Returns:
         Successful result with only the newest entry for each stable incident.
 
     Raises:
-        ValueError: If the response is not valid RSS XML.
+        ValueError: If the response is not valid feed XML.
     """
     try:
         root = ElementTree.fromstring(xml_text)
     except ElementTree.ParseError as exc:
-        raise ValueError(f"Invalid RSS XML: {exc}") from exc
+        raise ValueError(f"Invalid feed XML: {exc}") from exc
 
     newest: dict[str, tuple[float, str, str, str, str, tuple[str, ...]]] = {}
     for element in root.iter():
-        if element.tag.rsplit("}", 1)[-1].lower() != "item":
+        element_name = element.tag.rsplit("}", 1)[-1].lower()
+        if element_name not in {"item", "entry"}:
             continue
         title = _xml_child_text(element, "title")
-        description = clean_text(_xml_child_text(element, "description"))
-        guid = _xml_child_text(element, "guid")
+        description = clean_text(
+            _xml_child_text(element, "description")
+            or _xml_child_text(element, "content")
+            or _xml_child_text(element, "summary")
+        )
+        guid = _xml_child_text(element, "guid") or _xml_child_text(element, "id")
         link = _xml_child_text(element, "link")
-        published = _xml_child_text(element, "pubDate")
+        if not link:
+            for child in element:
+                if child.tag.rsplit("}", 1)[-1].lower() != "link":
+                    continue
+                if child.attrib.get("rel", "alternate").lower() != "alternate":
+                    continue
+                link = child.attrib.get("href", "").strip()
+                if link:
+                    break
+        published = (
+            _xml_child_text(element, "pubDate")
+            or _xml_child_text(element, "updated")
+            or _xml_child_text(element, "published")
+        )
         categories = tuple(
-            "".join(child.itertext()).strip().lower()
+            (
+                "".join(child.itertext()).strip()
+                or child.attrib.get("term", "").strip()
+            ).lower()
             for child in element
             if child.tag.rsplit("}", 1)[-1].lower() == "category"
         )
-        issue_id = _rss_issue_id(guid, link, title)
+        incident_match = (
+            re.search(r"/incidents/([^/?#]+)", link, flags=re.IGNORECASE)
+            if element_name == "entry" and spec.source_id == "deepseek"
+            else None
+        )
+        issue_id = (
+            f"incident_{incident_match.group(1)}"
+            if incident_match
+            else _rss_issue_id(guid, link, title)
+        )
         candidate = (
             _rss_timestamp(published),
             title,
@@ -604,8 +649,16 @@ def parse_rss(
         "service has returned to normal",
         "services have returned to normal",
         "resolved:",
+        "[resolved]",
+        "已恢复",
+        "已解决",
     )
-    maintenance_phrases = ("scheduled maintenance", "planned maintenance")
+    maintenance_phrases = (
+        "scheduled maintenance",
+        "planned maintenance",
+        "计划维护",
+        "预定维护",
+    )
     for issue_id, (
         _,
         title,
@@ -631,6 +684,9 @@ def parse_rss(
             {"unavailable", "outage", "critical"} & set(categories)
             or "disruption" in title_lower
             or "outage" in title_lower
+            or "not available" in title_lower
+            or "unavailable" in title_lower
+            or "不可用" in title
         ):
             severity = "critical"
         elif "maintenance" in title_lower:
@@ -644,7 +700,11 @@ def parse_rss(
             title=title or "Service status event",
             detail=description,
             updated_at=published,
-            status_url=link or spec.status_url,
+            status_url=(
+                spec.status_url
+                if spec.source_id == "deepseek"
+                else link or spec.status_url
+            ),
         )
         result.issues[issue.issue_id] = issue
     return result
