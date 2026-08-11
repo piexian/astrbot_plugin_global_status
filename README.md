@@ -25,7 +25,7 @@
 - Amazon Web Services、Microsoft Azure
 - GitHub、Cloudflare
 
-OpenAI、Claude、Groq、Cohere、Moonshot AI、MiniMax、DeepSeek、GitHub 和 Cloudflare 使用 Statuspage JSON；Google 使用 Google Cloud 事件 JSON；xAI、AWS 和 Azure 使用官方 RSS。DeepSeek 从官方状态页对应的 `deepseek.statuspage.io` JSON 后端抓取数据，但图片链接始终指向 `https://status.deepseek.com/`。还可以在插件配置中添加其他兼容 Statuspage JSON 的状态页。
+OpenAI、Claude、Groq、Cohere、Moonshot AI、MiniMax、GitHub 和 Cloudflare 使用 Statuspage JSON；Google 使用 Google Cloud 事件 JSON；xAI、DeepSeek、AWS 和 Azure 使用官方 RSS/Atom Feed。DeepSeek 从官方状态页对应的 `deepseek.statuspage.io/history.atom` 订阅事件，但图片链接始终指向 `https://status.deepseek.com/`。还可以在插件配置中添加其他兼容 Statuspage JSON 的状态页。
 
 ## 配置
 
@@ -91,7 +91,7 @@ OpenAI、Claude、Groq、Cohere、Moonshot AI、MiniMax、DeepSeek、GitHub 和 
 
 - 默认在首次成功检查时立即报告当时已经存在的异常；可通过 `notify_existing_on_first_startup` 关闭首次存量告警。
 - 相同状态不会重复发送；严重度、受影响服务或官方说明变化时会发送更新。
-- JSON 来源明确恢复后立即通知；RSS 事件连续两轮成功检查均消失后通知恢复。
+- JSON 来源明确恢复后立即通知；RSS/Atom Feed 明确标记恢复时立即通知，未明确标记的事件连续两轮成功检查均消失后通知恢复。
 - 单个来源请求失败不会被误判为恢复，也不会额外向群内发送“监控失败”告警。
 - 某个群发送失败时，下轮只重试该群。
 
