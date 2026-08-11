@@ -661,3 +661,63 @@ class GlobalStatusMonitor(star.Star):
             yield event.plain_result(
                 "厂商状态查询失败，请检查 AstrBot 日志和网络配置。"
             )
+
+    def _normalize_group_whitelist(self) -> list[str]:
+        """读取并清洗 group_whitelist；非列表或为空返回 []。"""
+        raw = self.config.get("group_whitelist", [])
+        if not isinstance(raw, list):
+            return []
+        return [str(item).strip() for item in raw if str(item).strip()]
+
+    async def _set_group_subscription(self, umo: str, action: str) -> str:
+        """按确定动作改写当前群 UMO 的订阅状态，并持久化到配置文件。
+
+        action 仅识别 "开" / "关" 两个确切取值；其它任何值一律返回用法，
+        不做推测匹配、不修改配置。
+        """
+        groups = self._normalize_group_whitelist()
+        present = umo in groups
+        token = action.strip()
+
+        if token == "开":
+            if present:
+                return "ℹ️ 当前群组已订阅厂商状态自动推送，无需重复开启。"
+            groups.append(umo)
+        elif token == "关":
+            if not present:
+                return "ℹ️ 当前群组未订阅厂商状态自动推送，无需关闭。"
+            groups.remove(umo)
+        else:
+            return "用法：/厂商订阅 开｜关"
+
+        # 一次调用完成「内存更新 + 落盘」，重启后保持。
+        await self.config.save_config_async({"group_whitelist": groups})
+
+        if token == "开":
+            return (
+                "✅ 已为当前群组开启厂商状态自动订阅，下一轮轮询后开始推送告警。\n"
+                f"当前订阅群组数：{len(groups)}。"
+            )
+        return (
+            "✅ 已为当前群组关闭厂商状态自动订阅，将不再收到主动告警。\n"
+            f"剩余订阅群组数：{len(groups)}。"
+        )
+
+    @filter.command("厂商订阅", alias={"vendor_subscribe"})
+    @filter.platform_adapter_type(
+        filter.PlatformAdapterType.AIOCQHTTP | filter.PlatformAdapterType.QQOFFICIAL
+    )
+    async def vendor_subscribe(self, event: AstrMessageEvent, action: str = ""):
+        """开启/关闭当前群组的厂商状态自动订阅，并持久化到配置文件。
+
+        用法：/厂商订阅 开｜关（参数非法时仅返回用法，不做猜测）。
+        """
+        if not event.is_admin():
+            yield event.plain_result("⚠️ 仅 Bot 管理员可执行此指令。")
+            return
+        umo = event.unified_msg_origin
+        if ":GroupMessage:" not in umo:
+            yield event.plain_result("⚠️ 该指令需在群聊中使用。")
+            return
+        reply = await self._set_group_subscription(umo, action)
+        yield event.plain_result(reply)
