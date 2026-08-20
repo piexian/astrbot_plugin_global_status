@@ -48,6 +48,16 @@ class DummyContext:
         return self.global_config
 
 
+class DummyConfig(dict):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.saved = []
+
+    async def save_config_async(self, replace_config):
+        self.update(replace_config)
+        self.saved.append(dict(replace_config))
+
+
 def _plugin(config=None, platforms=None):
     instance = GlobalStatusMonitor(
         DummyContext(platforms),
@@ -393,6 +403,70 @@ async def test_vendor_status_command_returns_image_without_mutating_state(monkey
     assert isinstance(responses[0][0], Image)
     assert fetch_count == 1
     assert plugin._state == before
+
+
+@pytest.mark.asyncio
+async def test_group_subscription_closes_plain_group_id(monkeypatch):
+    config = DummyConfig(
+        {"enabled": True, "group_whitelist": ["100"], "platform_id": ""}
+    )
+    plugin = _plugin(config)
+
+    reply = await plugin._set_group_subscription("1:GroupMessage:100", "关")
+
+    assert config["group_whitelist"] == []
+    assert config.saved == [{"group_whitelist": []}]
+    assert "已为当前群组关闭" in reply
+
+
+@pytest.mark.asyncio
+async def test_group_subscription_closes_all_matching_whitelist_formats():
+    umo = "1:GroupMessage:100"
+    config = DummyConfig(
+        {
+            "enabled": True,
+            "group_whitelist": ["100", umo, "200", "100"],
+            "platform_id": "",
+        }
+    )
+    plugin = _plugin(config)
+
+    await plugin._set_group_subscription(umo, "关")
+
+    assert config["group_whitelist"] == ["200"]
+    assert config.saved == [{"group_whitelist": ["200"]}]
+
+
+@pytest.mark.asyncio
+async def test_group_subscription_handles_qq_official_group_openid():
+    umo = "qq-instance:GroupMessage:group-openid"
+    config = DummyConfig(
+        {
+            "enabled": True,
+            "platform_type": "qq_official",
+            "group_whitelist": ["group-openid"],
+            "platform_id": "",
+        }
+    )
+    plugin = _plugin(config, platforms=[DummyPlatform("qq-instance", "qq_official")])
+
+    await plugin._set_group_subscription(umo, "关")
+
+    assert config["group_whitelist"] == []
+
+
+@pytest.mark.asyncio
+async def test_group_subscription_invalid_action_does_not_persist():
+    config = DummyConfig(
+        {"enabled": True, "group_whitelist": ["100"], "platform_id": ""}
+    )
+    plugin = _plugin(config)
+
+    reply = await plugin._set_group_subscription("1:GroupMessage:100", "开启")
+
+    assert reply == "用法：/厂商订阅 开｜关"
+    assert config["group_whitelist"] == ["100"]
+    assert config.saved == []
 
 
 @pytest.mark.asyncio
