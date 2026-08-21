@@ -51,6 +51,9 @@ OpenAI、Claude、Groq、Cohere、Moonshot AI、MiniMax、GitHub 和 Cloudflare 
    - aiocqhttp 群号：`123456789`
    - qq_official 群 openid：`E4BE1234ABCD5678`
    - 完整 UMO：`1:GroupMessage:123456789`
+
+   > 也可在目标群里用 `/厂商订阅 开` 让机器人自动把当前群 UMO 写入白名单（详见「命令 → 订阅开关」），无需手动复制 UMO。
+
 3. `platform_id`：仅对纯群号/group_openid 条目生效（用于拼接 UMO）。如果白名单中全部使用完整 UMO 格式，此项无需填写。留空时自动选择对应类型下唯一的活跃实例；存在多个实例时必须明确填写。
 4. `poll_interval_seconds`：默认 300 秒，最低 60 秒。
 5. `sources`：可单独停用任意内置来源。
@@ -82,10 +85,23 @@ OpenAI、Claude、Groq、Cohere、Moonshot AI、MiniMax、GitHub 和 Cloudflare 
 
 ## 命令
 
+### 状态查询
+
 - `/厂商状态`
 - `/vendor_status`
 
 以上命令行为相同：收到指令后立即抓取所有启用来源并返回最新状态总览图，不会修改自动告警的去重或送达状态。命令目前在 aiocqhttp 和 qq_official 平台生效，群聊和私聊均可使用。
+
+### 订阅开关
+
+- `/厂商订阅 开`：开启当前群的厂商状态自动推送——把本群 UMO 写入 `group_whitelist` 并持久化保存，下一轮轮询后开始收到告警。
+- `/厂商订阅 关`：关闭当前群的自动推送——从 `group_whitelist` 移除本群 UMO 并持久化保存，停止向本群推送。
+
+说明：
+- 仅 **Bot 管理员**可在 **群聊** 中使用；非管理员或私聊执行会被拒绝。
+- 参数只识别确切的 `开` / `关`；填写其它内容（含为空）只返回用法提示，不会改动配置。
+- 重复开启/关闭是幂等的，不会重复写盘。
+- 效果与在 WebUI 手动编辑 `group_whitelist` 等价，区别在于该指令直接落盘、重启后保持。
 
 ## 通知规则
 
